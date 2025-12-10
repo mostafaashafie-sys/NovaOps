@@ -1,4 +1,5 @@
-import { DataverseService, MockDataService } from './index.js';
+import DataverseService from './DataverseService.js';
+import MockDataService from './MockDataService.js';
 
 /**
  * Forecast Service

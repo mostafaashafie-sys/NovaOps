@@ -38,22 +38,23 @@ src/components/
 │
 └── OrderManagement/            # Order management feature components
     ├── index.js
-    ├── useOrderManagement.js   # Business logic hook
-    ├── PanelHeader.jsx
-    ├── PanelTabs.jsx
-    ├── DetailsTab.jsx
-    ├── ActionsTab.jsx
-    ├── POTab.jsx
-    ├── ForecastTab.jsx
-    ├── ShippingTab.jsx
+    ├── OrderManagementPanel.jsx
+    ├── components/
+    │   ├── index.js
+    │   ├── useOrderManagement.js   # Business logic hook
+    │   ├── PanelHeader.jsx
+    │   └── UnifiedDetailsTab.jsx   # Combined details and actions
     └── modals/
         ├── index.js
         ├── StatusModal.jsx
         ├── AllocationModal.jsx
-        ├── ShipmentModal.jsx
+        ├── MultiShipmentModal.jsx
         ├── ForecastModal.jsx
         ├── PlanModal.jsx
-        └── POApprovalModal.jsx
+        ├── ConfirmToPOModal.jsx
+        ├── POApprovalModal.jsx
+        ├── RegulatoryRejectModal.jsx
+        └── EditOrderItemModal.jsx
 ```
 
 ## Component Categories

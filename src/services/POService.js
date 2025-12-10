@@ -1,5 +1,7 @@
-import { DataverseService, MockDataService, OrderItemService } from './index.js';
-import { DataverseConfig } from '../config/index.js';
+import DataverseService from './DataverseService.js';
+import MockDataService from './MockDataService.js';
+import OrderItemService from './OrderItemService.js';
+import { DataverseConfig } from '@/config/index.js';
 
 /**
  * Purchase Order (PO) Service
@@ -51,10 +53,32 @@ class POService {
 
   /**
    * Create a new PO
+   * @param {string[]} orderItemIds - Array of order item IDs to include in PO
+   * @param {string} userId - User creating the PO
+   * @param {string} poName - Name/ID for the PO (required)
+   * @param {string} poDate - PO date (required, ISO date string)
+   * @param {string} deliveryDate - Delivery date (required, ISO date string)
    */
-  async createPO(orderItemIds = [], userId = 'Ahmed Hassan') {
+  async createPO(orderItemIds = [], userId = 'Ahmed Hassan', poName = null, poDate = null, deliveryDate = null) {
     if (this.useMock) {
       if (!this.mockData.orderItems) this.mockData.orderItems = [];
+      
+      // Validate required fields
+      if (!poName || poName.trim() === '') {
+        throw new Error('PO name is required');
+      }
+      if (!poDate) {
+        throw new Error('PO date is required');
+      }
+      if (!deliveryDate) {
+        throw new Error('Delivery date is required');
+      }
+      
+      // Check if PO name already exists
+      const existingPO = (this.mockData.purchaseOrders || []).find(p => p.id === poName.trim());
+      if (existingPO) {
+        throw new Error(`PO with name "${poName}" already exists. Please choose a different name.`);
+      }
       
       // Get order items to calculate totals
       const orderItems = this.mockData.orderItems.filter(oi => orderItemIds.includes(oi.id));
@@ -62,18 +86,28 @@ class POService {
         throw new Error('At least one order item is required to create a PO');
       }
       
-      const totalQtyCartons = orderItems.reduce((sum, oi) => sum + oi.qtyCartons, 0);
+      // Validate: All order items must belong to the same country
       const countries = [...new Set(orderItems.map(oi => oi.countryId))];
+      if (countries.length > 1) {
+        const countryNames = countries.map(cid => {
+          const oi = orderItems.find(oi => oi.countryId === cid);
+          return oi?.countryName || cid;
+        }).join(', ');
+        throw new Error(`Cannot create PO: Order items belong to multiple countries (${countryNames}). A PO can only contain order items for one country.`);
+      }
+      
+      const totalQtyCartons = orderItems.reduce((sum, oi) => sum + oi.qtyCartons, 0);
       const skus = [...new Set(orderItems.map(oi => oi.skuId))];
       
-      const poNumber = (this.mockData.purchaseOrders || []).length + 1;
       const newPO = {
-        id: `PO-2025-${String(poNumber).padStart(3, '0')}`,
-        status: 'Draft',
+        id: poName.trim(),
+        status: 'Draft', // Draft (1)
         orderItemIds: orderItemIds,
         totalQtyCartons: totalQtyCartons,
         countries: countries,
         skus: skus,
+        poDate: poDate, // PO creation/issue date
+        deliveryDate: deliveryDate, // Expected delivery date
         requestedBy: null,
         requestedOn: null,
         approvedBy: null,
@@ -102,6 +136,17 @@ class POService {
       return newPO;
     }
     
+    // For Dataverse, construct poData with all required fields
+    // Note: In production, orderItems would be fetched from Dataverse
+    const poData = {
+      id: poName.trim(),
+      poDate: poDate,
+      deliveryDate: deliveryDate,
+      orderItemIds: orderItemIds,
+      status: 'Draft',
+      createdBy: userId,
+      createdOn: new Date().toISOString()
+    };
     return this.dataverseService.createPO(poData);
   }
 
@@ -113,6 +158,33 @@ class POService {
       const po = (this.mockData.purchaseOrders || []).find(p => p.id === poId);
       if (!po) {
         throw new Error('PO not found');
+      }
+      
+      // Get existing order items in PO to check country
+      const existingOrderItems = (this.mockData.orderItems || []).filter(oi => po.orderItemIds.includes(oi.id));
+      const existingCountry = existingOrderItems.length > 0 ? existingOrderItems[0].countryId : null;
+      
+      // Get new order items to be added
+      const newOrderItems = (this.mockData.orderItems || []).filter(oi => orderItemIds.includes(oi.id));
+      
+      // Validate: All new order items must belong to the same country as existing PO items
+      if (existingCountry) {
+        const invalidItems = newOrderItems.filter(oi => oi.countryId !== existingCountry);
+        if (invalidItems.length > 0) {
+          const invalidCountryNames = [...new Set(invalidItems.map(oi => oi.countryName || oi.countryId))].join(', ');
+          const poCountryName = existingOrderItems[0]?.countryName || existingCountry;
+          throw new Error(`Cannot add order items to PO: PO ${poId} contains items for ${poCountryName}, but you are trying to add items for ${invalidCountryNames}. A PO can only contain order items for one country.`);
+        }
+      } else {
+        // If PO has no items yet, validate all new items belong to same country
+        const countries = [...new Set(newOrderItems.map(oi => oi.countryId))];
+        if (countries.length > 1) {
+          const countryNames = countries.map(cid => {
+            const oi = newOrderItems.find(oi => oi.countryId === cid);
+            return oi?.countryName || cid;
+          }).join(', ');
+          throw new Error(`Cannot create PO: Order items belong to multiple countries (${countryNames}). A PO can only contain order items for one country.`);
+        }
       }
       
       // Add order items to PO
@@ -143,7 +215,8 @@ class POService {
   }
 
   /**
-   * Request PO approval
+   * Request PO approval (CFO approval)
+   * Prerequisite: ALL order items in PO must have status "Regulatory Approved"
    */
   async requestPOApproval(poId, userId = 'Ahmed Hassan') {
     if (this.useMock) {
@@ -153,21 +226,33 @@ class POService {
       }
       
       if (po.status !== 'Draft') {
-        throw new Error('Only Draft POs can be submitted for approval');
+        throw new Error('Only Draft POs can be submitted for CFO approval');
       }
       
       if (!po.orderItemIds || po.orderItemIds.length === 0) {
         throw new Error('PO must have at least one order item');
       }
+
+      // Check that ALL order items have status "Regulatory Approved"
+      const orderItems = (this.mockData.orderItems || []).filter(oi => po.orderItemIds.includes(oi.id));
+      if (orderItems.length === 0) {
+        throw new Error('No order items found for this PO');
+      }
+
+      const allRegulatoryApproved = orderItems.every(oi => oi.status === 'Regulatory Approved');
+      if (!allRegulatoryApproved) {
+        const nonApprovedItems = orderItems.filter(oi => oi.status !== 'Regulatory Approved');
+        throw new Error(`Cannot request CFO approval: ${nonApprovedItems.length} order item(s) are not Regulatory Approved. All items must be Regulatory Approved before requesting CFO approval.`);
+      }
       
-      po.status = 'Approval Requested';
+      po.status = 'Pending CFO Approval'; // Pending CFO Approval (2)
       po.requestedBy = userId;
       po.requestedOn = new Date().toISOString();
       po.modifiedBy = userId;
       po.modifiedOn = new Date().toISOString();
       if (!po.history) po.history = [];
       po.history.push({
-        action: 'Approval Requested',
+        action: 'Pending CFO Approval',
         by: userId,
         date: new Date().toISOString()
       });
@@ -176,34 +261,34 @@ class POService {
     }
     
     return this.dataverseService.updatePO(poId, {
-      status: 'Approval Requested',
+      status: 'Pending CFO Approval',
       requestedBy: userId,
       requestedOn: new Date().toISOString()
     });
   }
 
   /**
-   * Approve PO (Manager action)
+   * Approve PO (CFO action)
    */
-  async approvePO(poId, managerId = 'Manager User') {
+  async approvePO(poId, managerId = 'CFO User') {
     if (this.useMock) {
       const po = (this.mockData.purchaseOrders || []).find(p => p.id === poId);
       if (!po) {
         throw new Error('PO not found');
       }
       
-      if (po.status !== 'Approval Requested') {
-        throw new Error('Only POs with Approval Requested status can be approved');
+      if (po.status !== 'Pending CFO Approval') {
+        throw new Error('Only POs with Pending CFO Approval status can be approved');
       }
       
-      po.status = 'Approved';
+      po.status = 'CFO Approved'; // CFO Approved (3)
       po.approvedBy = managerId;
       po.approvedOn = new Date().toISOString();
       po.modifiedBy = managerId;
       po.modifiedOn = new Date().toISOString();
       if (!po.history) po.history = [];
       po.history.push({
-        action: 'Approved',
+        action: 'CFO Approved',
         by: managerId,
         date: new Date().toISOString()
       });
@@ -212,32 +297,32 @@ class POService {
     }
     
     return this.dataverseService.updatePO(poId, {
-      status: 'Approved',
+      status: 'CFO Approved',
       approvedBy: managerId,
       approvedOn: new Date().toISOString()
     });
   }
 
   /**
-   * Reject PO (Manager action)
+   * Reject PO (CFO action)
    */
-  async rejectPO(poId, managerId = 'Manager User', reason = '') {
+  async rejectPO(poId, managerId = 'CFO User', reason = '') {
     if (this.useMock) {
       const po = (this.mockData.purchaseOrders || []).find(p => p.id === poId);
       if (!po) {
         throw new Error('PO not found');
       }
       
-      if (po.status !== 'Approval Requested') {
-        throw new Error('Only POs with Approval Requested status can be rejected');
+      if (po.status !== 'Pending CFO Approval') {
+        throw new Error('Only POs with Pending CFO Approval status can be rejected');
       }
       
-      po.status = 'Rejected';
+      po.status = 'Draft'; // Rejected POs go back to Draft
       po.modifiedBy = managerId;
       po.modifiedOn = new Date().toISOString();
       if (!po.history) po.history = [];
       po.history.push({
-        action: 'Rejected',
+        action: 'Rejected by CFO',
         by: managerId,
         date: new Date().toISOString(),
         reason: reason
@@ -247,14 +332,15 @@ class POService {
     }
     
     return this.dataverseService.updatePO(poId, {
-      status: 'Rejected',
+      status: 'Draft',
       modifiedBy: managerId,
       modifiedOn: new Date().toISOString()
     });
   }
 
   /**
-   * Confirm PO to UP (LO action after approval)
+   * Confirm PO to UP (LO action after CFO approval)
+   * Changes ALL order items in PO to "Back Order" status
    */
   async confirmPOToUP(poId, userId = 'Ahmed Hassan') {
     if (this.useMock) {
@@ -263,11 +349,11 @@ class POService {
         throw new Error('PO not found');
       }
       
-      if (po.status !== 'Approved') {
-        throw new Error('Only Approved POs can be confirmed to UP');
+      if (po.status !== 'CFO Approved') {
+        throw new Error('Only CFO Approved POs can be confirmed to UP');
       }
       
-      po.status = 'Confirmed to UP';
+      po.status = 'Confirmed to UP'; // Confirmed to UP (4)
       po.confirmedBy = userId;
       po.confirmedOn = new Date().toISOString();
       po.modifiedBy = userId;
@@ -279,17 +365,17 @@ class POService {
         date: new Date().toISOString()
       });
       
-      // Update all order items in PO to "Confirmed to UP"
+      // Update all order items in PO to "Back Order" (not "Confirmed to UP")
       if (this.mockData.orderItems) {
         this.mockData.orderItems
           .filter(oi => oi.poId === poId)
           .forEach(oi => {
-            oi.status = 'Confirmed to UP';
+            oi.status = 'Back Order';
             oi.modifiedBy = userId;
             oi.modifiedOn = new Date().toISOString();
             if (!oi.history) oi.history = [];
             oi.history.push({
-              action: 'Confirmed to UP',
+              action: 'Confirmed to UP - Back Order',
               by: userId,
               date: new Date().toISOString()
             });
@@ -304,6 +390,56 @@ class POService {
       confirmedBy: userId,
       confirmedOn: new Date().toISOString()
     });
+  }
+
+  /**
+   * Check and update PO completion status
+   * PO becomes "Completed" when all order items have status "Arrived to Market"
+   */
+  async checkAndUpdatePOCompletion(poId) {
+    if (this.useMock) {
+      const po = (this.mockData.purchaseOrders || []).find(p => p.id === poId);
+      if (!po) {
+        return null;
+      }
+      
+      // Only check completion for POs that are "Confirmed to UP"
+      if (po.status !== 'Confirmed to UP') {
+        return po;
+      }
+      
+      // Get all order items for this PO
+      const orderItems = (this.mockData.orderItems || []).filter(oi => oi.poId === poId);
+      
+      // Check if all items have arrived
+      if (orderItems.length > 0) {
+        const allArrived = orderItems.every(oi => oi.status === 'Arrived to Market');
+        const hasDeleted = orderItems.some(oi => oi.status === 'Deleted');
+        
+        // If all items are either Arrived or Deleted, mark PO as Completed
+        const allFinalized = orderItems.every(oi => 
+          oi.status === 'Arrived to Market' || oi.status === 'Deleted'
+        );
+        
+        if (allFinalized && orderItems.length > 0) {
+          po.status = 'Completed'; // Completed (5)
+          po.modifiedOn = new Date().toISOString();
+          if (!po.history) po.history = [];
+          po.history.push({
+            action: 'Completed - All items arrived',
+            by: 'System',
+            date: new Date().toISOString()
+          });
+          
+          return po;
+        }
+      }
+      
+      return po;
+    }
+    
+    // In production, check via Dataverse
+    return this.dataverseService.fetch(`/${DataverseConfig.tables.purchaseOrders}(${poId})`);
   }
 
   /**

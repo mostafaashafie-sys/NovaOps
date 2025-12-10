@@ -1,20 +1,27 @@
-import React from 'react';
 
 /**
  * Card Component
  * Dashboard card with icon and metrics
  */
-export const Card = ({ title, value, subtitle, icon, trend, color = 'blue' }) => {
+export const Card = ({ title, value, subtitle, icon, trend, color = 'blue', onClick, clickable = false }) => {
   const colorClasses = {
     blue: 'from-blue-500 to-blue-600',
     green: 'from-emerald-500 to-emerald-600',
     amber: 'from-amber-500 to-amber-600',
     red: 'from-red-500 to-red-600',
     purple: 'from-purple-500 to-purple-600',
+    orange: 'from-orange-500 to-orange-600',
   };
   
+  const isClickable = clickable || onClick;
+  
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-lg transition-shadow">
+    <div 
+      className={`bg-white rounded-xl border border-gray-200 p-5 transition-all ${
+        isClickable ? 'hover:shadow-lg hover:scale-105 cursor-pointer' : 'hover:shadow-lg'
+      }`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div>
           <p className="text-sm font-medium text-gray-500">{title}</p>

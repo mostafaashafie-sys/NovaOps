@@ -1,14 +1,18 @@
-import React, { useState } from 'react';
-import { AppProvider } from './providers/index.js';
-import { Navigation } from './components/index.js';
+import { useState } from 'react';
+import { AppProvider } from '@/providers/index.js';
+import { Navigation } from '@/components/index.js';
 import { 
   HomePage, 
-  StockCoverPage, 
-  OrdersPage, 
+  StockManagementPage, 
   ForecastsPage, 
   AllocationsPage, 
-  ShipmentsPage 
-} from './pages/index.js';
+  ShipmentsPage,
+  RegulatoryApprovalPage,
+  POApprovalPage,
+  POManagementPage,
+  ReportsPage,
+  SettingsPage
+} from '@/pages/index.js';
 
 /**
  * Main App Component
@@ -33,35 +37,25 @@ function App() {
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <HomePage />;
+        return <HomePage onNavigate={setCurrentPage} />;
       case 'stockcover':
-        return <StockCoverPage onCreateOrder={handleCreateOrder} onViewOrder={handleViewOrder} />;
-      case 'orders':
-        return <OrdersPage onViewOrder={handleViewOrder} onCreateOrder={handleCreateOrder} />;
+        return <StockManagementPage onCreateOrder={handleCreateOrder} onViewOrder={handleViewOrder} />;
       case 'forecasts':
         return <ForecastsPage />;
       case 'allocations':
         return <AllocationsPage />;
       case 'shipments':
         return <ShipmentsPage />;
+      case 'regulatory-approval':
+        return <RegulatoryApprovalPage />;
+      case 'po-management':
+        return <POManagementPage />;
+      case 'po-approval':
+        return <POApprovalPage />;
       case 'reports':
-        return (
-          <div className="space-y-4">
-            <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
-              <p className="text-lg">Reports interface coming soon</p>
-            </div>
-          </div>
-        );
+        return <ReportsPage />;
       case 'settings':
-        return (
-          <div className="space-y-4">
-            <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-500">
-              <p className="text-lg">Settings interface coming soon</p>
-            </div>
-          </div>
-        );
+        return <SettingsPage />;
       default:
         return <HomePage />;
     }

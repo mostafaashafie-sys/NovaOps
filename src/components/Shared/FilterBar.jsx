@@ -1,5 +1,4 @@
-import React from 'react';
-import { useApp } from '../providers/index.js';
+import { useApp } from '@/providers/index.js';
 
 /**
  * Filter Bar Component

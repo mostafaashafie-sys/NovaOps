@@ -1,11 +1,13 @@
-import React from 'react';
-import StatusBadge from './StatusBadge.jsx';
+
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('OrderPill');
 
 /**
  * Order Pill Component
- * Displays an order item as a clickable pill with status and PO info
+ * Displays an order item as a clickable pill with amount, PO number, and status
  */
-export const OrderPill = ({ orderItem, onClick, showPO = true }) => {
+export const OrderPill = ({ orderItem, onClick, showPO = true, onDragStart: onDragStartCallback, onDragEnd: onDragEndCallback }) => {
   const getStatusColor = (status) => {
     const colors = {
       'Forecasted': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
@@ -20,29 +22,110 @@ export const OrderPill = ({ orderItem, onClick, showPO = true }) => {
   };
 
   const statusColors = getStatusColor(orderItem.status);
-  const tooltipText = `${orderItem.id}\nStatus: ${orderItem.status}\nQty: ${orderItem.qtyCartons} cartons${orderItem.poId ? `\nPO: ${orderItem.poId}` : ''}`;
+
+  const handleDragStart = (e) => {
+    // Prevent dragging if item is in a non-draggable state
+    if (!orderItem.deliveryMonth) {
+      e.preventDefault();
+      return;
+    }
+
+    logger.action('Drag started', {
+      orderItemId: orderItem.id,
+      currentMonth: orderItem.deliveryMonth,
+      qtyCartons: orderItem.qtyCartons,
+      status: orderItem.status,
+      poId: orderItem.poId
+    });
+    
+    // Set drag effect and data
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.dropEffect = 'move';
+    
+    // Set data in multiple formats for better compatibility
+    const dragData = {
+      orderItemId: orderItem.id,
+      currentMonth: orderItem.deliveryMonth,
+      qtyCartons: orderItem.qtyCartons,
+      status: orderItem.status
+    };
+    
+    try {
+      e.dataTransfer.setData('application/json', JSON.stringify(dragData));
+      e.dataTransfer.setData('text/plain', orderItem.id); // Fallback for some browsers
+    } catch (err) {
+      logger.error('Error setting drag data', err);
+    }
+    
+    // Create a custom drag image for better UX
+    const dragImage = e.currentTarget.cloneNode(true);
+    dragImage.style.position = 'absolute';
+    dragImage.style.top = '-1000px';
+    dragImage.style.opacity = '0.8';
+    dragImage.style.transform = 'rotate(2deg)';
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, e.currentTarget.offsetWidth / 2, e.currentTarget.offsetHeight / 2);
+    
+    // Clean up drag image after a short delay
+    setTimeout(() => {
+      if (document.body.contains(dragImage)) {
+        document.body.removeChild(dragImage);
+      }
+    }, 0);
+    
+    // Visual feedback: reduce opacity of original element
+    e.currentTarget.style.opacity = '0.5';
+    e.currentTarget.style.cursor = 'grabbing';
+    
+    // Notify parent component about drag start
+    if (onDragStartCallback) {
+      onDragStartCallback({
+        orderItemId: orderItem.id,
+        currentMonth: orderItem.deliveryMonth
+      });
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    logger.debug('Drag ended', {
+      orderItemId: orderItem.id,
+      currentMonth: orderItem.deliveryMonth
+    });
+    
+    // Restore visual state
+    e.currentTarget.style.opacity = '1';
+    e.currentTarget.style.cursor = 'grab';
+    
+    // Notify parent component about drag end
+    if (onDragEndCallback) {
+      onDragEndCallback();
+    }
+  };
 
   return (
     <button
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
       onClick={(e) => {
         e.stopPropagation();
         onClick?.(orderItem);
       }}
-      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium border transition-all hover:scale-105 hover:shadow-md ${statusColors.bg} ${statusColors.text} ${statusColors.border}`}
-      title={tooltipText}
+      className={`group w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-medium border-2 transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${statusColors.border} ${statusColors.bg} ${statusColors.text}`}
     >
-      <span className="font-semibold">{orderItem.id}</span>
-      <span className={`px-1.5 py-0.5 rounded text-[10px] ${statusColors.bg} ${statusColors.text}`}>
-        {orderItem.status}
+      <span className="font-semibold">
+        {orderItem.qtyCartons} cartons
       </span>
-      {showPO && orderItem.poId && (
-        <span className="px-1.5 py-0.5 rounded text-[10px] bg-white/50 text-gray-700 font-medium">
-          {orderItem.poId}
+      <div className="flex items-center gap-2">
+        {showPO && orderItem.poId && (
+          <span className="px-2 py-0.5 rounded bg-white/80 text-gray-800 font-semibold border border-gray-300 text-[10px]">
+            PO: {orderItem.poId}
+          </span>
+        )}
+        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${statusColors.bg} ${statusColors.text} border ${statusColors.border}`}>
+          {orderItem.status}
         </span>
-      )}
-      <span className="text-[10px] opacity-75">
-        {orderItem.qtyCartons}C
-      </span>
+      </div>
     </button>
   );
 };

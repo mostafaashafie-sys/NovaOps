@@ -1,142 +1,203 @@
-import { useState, useEffect, useCallback } from 'react';
-import { OrderItemService } from '../services/index.js';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { OrderItemService } from '@/services/index.js';
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('useOrderItems');
 
 /**
  * Custom Hook for OrderItem Management
  * Separates UI from service layer
  */
 export const useOrderItems = (initialFilters = {}) => {
-  const [orderItems, setOrderItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState(initialFilters);
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = React.useState(initialFilters);
 
-  /**
-   * Load order items with current filters
-   */
-  const loadOrderItems = useCallback(async () => {
+  const { data: orderItems = [], isLoading: loading, error } = useQuery({
+    queryKey: ['orderItems', filters],
+    queryFn: () => OrderItemService.getOrderItems(filters),
+  });
+
+  const getOrderItemById = async (orderItemId) => {
     try {
-      setLoading(true);
-      setError(null);
-      const data = await OrderItemService.getOrderItems(filters);
-      setOrderItems(data);
+      return await OrderItemService.getOrderItemById(orderItemId);
     } catch (err) {
-      setError(err.message);
-      console.error('Error loading order items:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    loadOrderItems();
-  }, [loadOrderItems]);
-
-  /**
-   * Get order item by ID
-   */
-  const getOrderItemById = useCallback(async (orderItemId) => {
-    try {
-      setError(null);
-      const orderItem = await OrderItemService.getOrderItemById(orderItemId);
-      return orderItem;
-    } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Plan a forecasted order item (link to PO)
-   */
-  const planOrderItem = useCallback(async (orderItemId, poId, userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const updated = await OrderItemService.planOrderItem(orderItemId, poId, userId);
-      await loadOrderItems(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadOrderItems]);
+  const planOrderItemMutation = useMutation({
+    mutationFn: ({ orderItemId, poId, userId }) =>
+      OrderItemService.planOrderItem(orderItemId, poId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Update order item status
-   */
-  const updateOrderItemStatus = useCallback(async (orderItemId, newStatus, userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const updated = await OrderItemService.updateOrderItemStatus(orderItemId, newStatus, userId);
-      await loadOrderItems(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadOrderItems]);
+  const confirmOrderItemToPOMutation = useMutation({
+    mutationFn: ({ orderItemId, labelId, userId }) =>
+      OrderItemService.confirmOrderItemToPO(orderItemId, labelId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Get forecasted order items
-   */
-  const getForecastedOrderItems = useCallback(async (filters = {}) => {
+  const updateOrderItemStatusMutation = useMutation({
+    mutationFn: ({ orderItemId, newStatus, userId }) =>
+      OrderItemService.updateOrderItemStatus(orderItemId, newStatus, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+    },
+  });
+
+  const approveRegulatoryLabelMutation = useMutation({
+    mutationFn: ({ orderItemId, userId }) =>
+      OrderItemService.approveRegulatoryLabel(orderItemId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
+
+  const rejectRegulatoryLabelMutation = useMutation({
+    mutationFn: ({ orderItemId, reason, userId }) =>
+      OrderItemService.rejectRegulatoryLabel(orderItemId, reason, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
+
+  const getForecastedOrderItems = async (filters = {}) => {
     try {
-      setError(null);
       return await OrderItemService.getForecastedOrderItems(filters);
     } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Get planned order items
-   */
-  const getPlannedOrderItems = useCallback(async (filters = {}) => {
+  const getPlannedOrderItems = async (filters = {}) => {
     try {
-      setError(null);
       return await OrderItemService.getPlannedOrderItems(filters);
     } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Get confirmed to UP order items
-   */
-  const getConfirmedToUPOrderItems = useCallback(async (filters = {}) => {
+  const getBackOrderItems = async (filters = {}) => {
     try {
-      setError(null);
-      return await OrderItemService.getConfirmedToUPOrderItems(filters);
+      return await OrderItemService.getBackOrderItems(filters);
     } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Refresh order items
-   */
-  const refresh = useCallback(() => {
-    loadOrderItems();
-  }, [loadOrderItems]);
+  const getPendingRegulatoryItems = async (filters = {}) => {
+    try {
+      return await OrderItemService.getPendingRegulatoryItems(filters);
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const getRegulatoryApprovedItems = async (filters = {}) => {
+    try {
+      return await OrderItemService.getRegulatoryApprovedItems(filters);
+    } catch (err) {
+      throw err;
+    }
+  };
+
+  const createOrderItemMutation = useMutation({
+    mutationFn: (orderItemData) => OrderItemService.createOrderItem(orderItemData),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+    },
+  });
+
+  const updateDeliveryMonthMutation = useMutation({
+    mutationFn: ({ orderItemId, newDeliveryMonth, userId }) => {
+      logger.action('updateDeliveryMonth mutation started', {
+        orderItemId,
+        newDeliveryMonth,
+        userId
+      });
+      return OrderItemService.updateOrderItemDeliveryMonth(orderItemId, newDeliveryMonth, userId);
+    },
+    onSuccess: (data) => {
+      logger.success('updateDeliveryMonth mutation succeeded', {
+        orderItemId: data?.id,
+        newDeliveryMonth: data?.deliveryMonth
+      });
+      logger.debug('Invalidating queries: orderItems, stockCover');
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['stockCover'] });
+      logger.debug('Queries invalidated');
+    },
+    onError: (error) => {
+      logger.error('updateDeliveryMonth mutation failed', {
+        error: error.message,
+        stack: error.stack
+      });
+    },
+  });
+
+  const updateOrderItemMutation = useMutation({
+    mutationFn: ({ orderItemId, ...updates }) =>
+      OrderItemService.updateOrderItem(orderItemId, updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['stockCover'] });
+    },
+  });
+
+  const deleteOrderItemMutation = useMutation({
+    mutationFn: ({ orderItemId, userId }) =>
+      OrderItemService.deleteOrderItem(orderItemId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+      queryClient.invalidateQueries({ queryKey: ['stockCover'] });
+    },
+  });
+
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+  };
 
   return {
     orderItems,
     loading,
-    error,
+    error: error?.message || null,
     filters,
     setFilters,
     getOrderItemById,
-    planOrderItem,
-    updateOrderItemStatus,
+    planOrderItem: (orderItemId, poId, userId = 'Ahmed Hassan') =>
+      planOrderItemMutation.mutateAsync({ orderItemId, poId, userId }),
+    confirmOrderItemToPO: (orderItemId, labelId, userId = 'Ahmed Hassan') =>
+      confirmOrderItemToPOMutation.mutateAsync({ orderItemId, labelId, userId }),
+    updateOrderItemStatus: (orderItemId, newStatus, userId = 'Ahmed Hassan') =>
+      updateOrderItemStatusMutation.mutateAsync({ orderItemId, newStatus, userId }),
+    approveRegulatoryLabel: (orderItemId, userId = 'Regulatory Office') =>
+      approveRegulatoryLabelMutation.mutateAsync({ orderItemId, userId }),
+    rejectRegulatoryLabel: (orderItemId, reason = '', userId = 'Regulatory Office') =>
+      rejectRegulatoryLabelMutation.mutateAsync({ orderItemId, reason, userId }),
+    createOrderItem: (orderItemData) =>
+      createOrderItemMutation.mutateAsync(orderItemData),
+    updateDeliveryMonth: (orderItemId, newDeliveryMonth, userId = 'Ahmed Hassan') =>
+      updateDeliveryMonthMutation.mutateAsync({ orderItemId, newDeliveryMonth, userId }),
+    updateOrderItem: (orderItemId, updates, userId = 'Ahmed Hassan') =>
+      updateOrderItemMutation.mutateAsync({ orderItemId, ...updates, userId }),
+    deleteOrderItem: (orderItemId, userId = 'Ahmed Hassan') =>
+      deleteOrderItemMutation.mutateAsync({ orderItemId, userId }),
     getForecastedOrderItems,
     getPlannedOrderItems,
-    getConfirmedToUPOrderItems,
+    getBackOrderItems,
+    getPendingRegulatoryItems,
+    getRegulatoryApprovedItems,
     refresh
   };
 };
 
 export default useOrderItems;
-

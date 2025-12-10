@@ -1,5 +1,4 @@
-import React from 'react';
-import { getStatusColor } from '../utils/formatters.js';
+import { getStatusColor } from '@/utils/formatters.js';
 
 /**
  * Status Badge Component

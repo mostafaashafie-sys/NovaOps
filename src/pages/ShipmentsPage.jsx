@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
-import { useApp } from '../providers/index.js';
-import { useShipments } from '../hooks/index.js';
-import { FilterBar, StatusBadge, PageHeader, LoadingState, ErrorState, ShipmentDetailsModal } from '../components/index.js';
-import { formatNumber } from '../utils/index.js';
+import { useState } from 'react';
+import { useApp } from '@/providers/index.js';
+import { useShipments, useOrderItems } from '@/hooks/index.js';
+import { FilterBar, StatusBadge, PageHeader, LoadingState, ErrorState, ShipmentDetailsModal } from '@/components/index.js';
+import { MultiShipmentModal } from '@/components/OrderManagement/modals/index.js';
+import { formatNumber } from '@/utils/index.js';
 
 /**
  * Shipments Page Component
+ * Enhanced with multi-select shipping capability
  */
 export const ShipmentsPage = () => {
   const { data } = useApp();
-  const { shipments, loading, error, filters, setFilters } = useShipments();
+  const { shipments, loading, error, filters, setFilters, refresh, addToShipment } = useShipments();
+  const { orderItems } = useOrderItems();
   const [selectedShipment, setSelectedShipment] = useState(null);
+  const [showMultiShipmentModal, setShowMultiShipmentModal] = useState(false);
 
   if (!data || loading) {
     return <LoadingState message="Loading shipments..." />;
@@ -20,11 +24,33 @@ export const ShipmentsPage = () => {
     return <ErrorState message={error} />;
   }
 
+  const handleCreateShipment = async (shipmentData) => {
+    try {
+      await ShipmentService.createShipment(shipmentData);
+      await refresh();
+    } catch (err) {
+      alert('Error creating shipment: ' + err.message);
+      throw err;
+    }
+  };
+
+  const handleAddToShipment = async (shipmentId, orderItemIds) => {
+    try {
+      await ShipmentService.addOrderItemsToShipment(shipmentId, orderItemIds);
+      await refresh();
+    } catch (err) {
+      alert('Error adding items to shipment: ' + err.message);
+      throw err;
+    }
+  };
+
   return (
     <div className="space-y-4">
       <PageHeader 
         title="Shipping Management" 
         description="Track and manage shipments"
+        action={() => setShowMultiShipmentModal(true)}
+        actionLabel="Create Shipment"
       />
 
       <FilterBar filters={filters} onFilterChange={setFilters} showSKU={false} />
@@ -69,6 +95,13 @@ export const ShipmentsPage = () => {
         isOpen={!!selectedShipment} 
         onClose={() => setSelectedShipment(null)} 
         shipment={selectedShipment}
+      />
+
+      <MultiShipmentModal
+        isOpen={showMultiShipmentModal}
+        onClose={() => setShowMultiShipmentModal(false)}
+        onCreateShipment={handleCreateShipment}
+        onAddToShipment={handleAddToShipment}
       />
     </div>
   );

@@ -1,8 +1,7 @@
-import React from 'react';
-import { useApp } from '../providers/index.js';
-import { useAllocations } from '../hooks/index.js';
-import { FilterBar, StatusBadge, PageHeader, LoadingState, ErrorState } from '../components/index.js';
-import { formatNumber } from '../utils/index.js';
+import { useApp } from '@/providers/index.js';
+import { useAllocations } from '@/hooks/index.js';
+import { FilterBar, StatusBadge, PageHeader, LoadingState, ErrorState } from '@/components/index.js';
+import { formatNumber } from '@/utils/index.js';
 
 /**
  * Allocations Page Component
@@ -33,7 +32,7 @@ export const AllocationsPage = () => {
           <thead>
             <tr className="bg-gray-50 border-b border-gray-200">
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Allocation ID</th>
-              <th className="px-4 py-3 text-left font-semibold text-gray-600">Order</th>
+              <th className="px-4 py-3 text-left font-semibold text-gray-600">Order Item</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">SKU</th>
               <th className="px-4 py-3 text-left font-semibold text-gray-600">Country</th>
               <th className="px-4 py-3 text-right font-semibold text-gray-600">Allocated Qty</th>
@@ -44,7 +43,7 @@ export const AllocationsPage = () => {
             {allocations.map(allocation => (
               <tr key={allocation.id} className="border-b border-gray-50 hover:bg-gray-50/50">
                 <td className="px-4 py-3 font-medium text-gray-900">{allocation.id}</td>
-                <td className="px-4 py-3 text-blue-600">{allocation.orderId}</td>
+                <td className="px-4 py-3 text-blue-600 font-mono text-sm">{allocation.orderItemId}</td>
                 <td className="px-4 py-3">
                   <div>
                     <div className="font-medium text-gray-900">{allocation.skuId}</div>

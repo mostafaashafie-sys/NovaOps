@@ -1,85 +1,51 @@
-import { useState, useEffect, useCallback } from 'react';
-import { ForecastService } from '../services/index.js';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { ForecastService } from '@/services/index.js';
 
 /**
  * Custom Hook for Forecast Management
  * Separates UI from service layer
  */
 export const useForecasts = (initialFilters = {}) => {
-  const [forecasts, setForecasts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState(initialFilters);
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = React.useState(initialFilters);
 
-  /**
-   * Load forecasts with current filters
-   */
-  const loadForecasts = useCallback(async () => {
+  const { data: forecasts = [], isLoading: loading, error } = useQuery({
+    queryKey: ['forecasts', filters],
+    queryFn: () => ForecastService.getForecasts(filters),
+  });
+
+  const getForecastsBySKU = async () => {
     try {
-      setLoading(true);
-      setError(null);
-      const data = await ForecastService.getForecasts(filters);
-      setForecasts(data);
-    } catch (err) {
-      setError(err.message);
-      console.error('Error loading forecasts:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    loadForecasts();
-  }, [loadForecasts]);
-
-  /**
-   * Get forecasts grouped by SKU
-   */
-  const getForecastsBySKU = useCallback(async () => {
-    try {
-      setError(null);
       return await ForecastService.getForecastsBySKU(filters);
     } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, [filters]);
+  };
 
-  /**
-   * Update forecast
-   */
-  const updateForecast = useCallback(async (forecastId, data) => {
-    try {
-      setError(null);
-      const updated = await ForecastService.updateForecast(forecastId, data);
-      setForecasts(prev => prev.map(f => 
-        f.id === forecastId ? updated : f
-      ));
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, []);
+  const updateForecastMutation = useMutation({
+    mutationFn: ({ forecastId, data }) => 
+      ForecastService.updateForecast(forecastId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['forecasts'] });
+    },
+  });
 
-  /**
-   * Refresh forecasts
-   */
-  const refresh = useCallback(() => {
-    loadForecasts();
-  }, [loadForecasts]);
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['forecasts'] });
+  };
 
   return {
     forecasts,
     loading,
-    error,
+    error: error?.message || null,
     filters,
     setFilters,
     getForecastsBySKU,
-    updateForecast,
+    updateForecast: (forecastId, data) => 
+      updateForecastMutation.mutateAsync({ forecastId, data }),
     refresh
   };
 };
 
 export default useForecasts;
-

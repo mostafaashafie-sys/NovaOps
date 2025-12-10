@@ -1,4 +1,4 @@
-import { DataverseConfig } from '../config/index.js';
+import { DataverseConfig } from '@/config/index.js';
 
 /**
  * Dataverse API Service

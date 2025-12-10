@@ -1,6 +1,6 @@
-import React from 'react';
-import { OrderPill } from '../../index.js';
-import { formatNumber, formatCover, getCoverColor, getCoverTextColor } from '../../utils/index.js';
+import { Fragment } from 'react';
+import { OrderPill } from '@/components/index.js';
+import { formatNumber, formatCover, getCoverColor, getCoverTextColor } from '@/utils/index.js';
 
 /**
  * Stock Cover Table Component
@@ -40,7 +40,7 @@ export const StockCoverTable = ({
                 {years.map(year => {
                   const yearMonths = monthsByYear[year];
                   return (
-                    <React.Fragment key={year}>
+                    <Fragment key={year}>
                       <th 
                         className="px-2 py-2 text-center font-bold text-blue-900 border-l-2 border-blue-300"
                         colSpan={yearMonths.length}
@@ -52,7 +52,7 @@ export const StockCoverTable = ({
                       >
                         {year} Total
                       </th>
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
               </tr>
@@ -63,7 +63,7 @@ export const StockCoverTable = ({
                 {years.map(year => {
                   const yearMonths = monthsByYear[year];
                   return (
-                    <React.Fragment key={year}>
+                    <Fragment key={year}>
                       {yearMonths.map(month => (
                         <th 
                           key={month.key} 
@@ -85,14 +85,14 @@ export const StockCoverTable = ({
                       >
                         {year} Total
                       </th>
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
               </tr>
             </thead>
             <tbody>
               {Object.entries(countryData).map(([skuId, skuData], skuIdx) => (
-                <React.Fragment key={skuId}>
+                <Fragment key={skuId}>
                   {measures.map((measure, mIdx) => (
                     <StockCoverTableRow
                       key={`${skuId}-${measure.key}`}
@@ -113,7 +113,7 @@ export const StockCoverTable = ({
                       onAddOrder={onAddOrder}
                     />
                   ))}
-                </React.Fragment>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -160,7 +160,7 @@ const StockCoverTableRow = ({
         const yearMonths = monthsByYear[year];
         const yearTotal = calculateYearTotal(skuData, measure, yearMonths);
         return (
-          <React.Fragment key={year}>
+          <Fragment key={year}>
             {yearMonths.map(month => (
               <StockCoverTableCell
                 key={month.key}
@@ -185,7 +185,7 @@ const StockCoverTableRow = ({
             >
               {formatYearTotal(yearTotal, measure.type)}
             </td>
-          </React.Fragment>
+          </Fragment>
         );
       })}
     </tr>

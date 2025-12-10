@@ -1,179 +1,111 @@
-import { useState, useEffect, useCallback } from 'react';
-import { POService } from '../services/index.js';
+import React from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { POService } from '@/services/index.js';
 
 /**
  * Custom Hook for Purchase Order (PO) Management
  * Separates UI from service layer
  */
 export const usePOs = (initialFilters = {}) => {
-  const [pos, setPOs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState(initialFilters);
+  const queryClient = useQueryClient();
+  const [filters, setFilters] = React.useState(initialFilters);
 
-  /**
-   * Load POs with current filters
-   */
-  const loadPOs = useCallback(async () => {
+  const { data: pos = [], isLoading: loading, error } = useQuery({
+    queryKey: ['pos', filters],
+    queryFn: () => POService.getPOs(filters),
+  });
+
+  const getPOById = async (poId) => {
     try {
-      setLoading(true);
-      setError(null);
-      const data = await POService.getPOs(filters);
-      setPOs(data);
+      return await POService.getPOById(poId);
     } catch (err) {
-      setError(err.message);
-      console.error('Error loading POs:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    loadPOs();
-  }, [loadPOs]);
-
-  /**
-   * Get PO by ID
-   */
-  const getPOById = useCallback(async (poId) => {
-    try {
-      setError(null);
-      const po = await POService.getPOById(poId);
-      return po;
-    } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Get PO summary (with order items)
-   */
-  const getPOSummary = useCallback(async (poId) => {
+  const getPOSummary = async (poId) => {
     try {
-      setError(null);
-      const summary = await POService.getPOSummary(poId);
-      return summary;
+      return await POService.getPOSummary(poId);
     } catch (err) {
-      setError(err.message);
       throw err;
     }
-  }, []);
+  };
 
-  /**
-   * Create a new PO
-   */
-  const createPO = useCallback(async (orderItemIds = [], userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const newPO = await POService.createPO(orderItemIds, userId);
-      await loadPOs(); // Refresh
-      return newPO;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const createPOMutation = useMutation({
+    mutationFn: ({ orderItemIds, userId, poName, poDate, deliveryDate }) =>
+      POService.createPO(orderItemIds, userId, poName, poDate, deliveryDate),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+    },
+  });
 
-  /**
-   * Link order items to existing PO
-   */
-  const linkOrderItemsToPO = useCallback(async (poId, orderItemIds, userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const updated = await POService.linkOrderItemsToPO(poId, orderItemIds, userId);
-      await loadPOs(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const linkOrderItemsToPOMutation = useMutation({
+    mutationFn: ({ poId, orderItemIds, userId }) =>
+      POService.linkOrderItemsToPO(poId, orderItemIds, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+      queryClient.invalidateQueries({ queryKey: ['orderItems'] });
+    },
+  });
 
-  /**
-   * Request PO approval
-   */
-  const requestPOApproval = useCallback(async (poId, userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const updated = await POService.requestPOApproval(poId, userId);
-      await loadPOs(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const requestPOApprovalMutation = useMutation({
+    mutationFn: ({ poId, userId }) => POService.requestPOApproval(poId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Approve PO (Manager action)
-   */
-  const approvePO = useCallback(async (poId, managerId = 'Manager User') => {
-    try {
-      setError(null);
-      const updated = await POService.approvePO(poId, managerId);
-      await loadPOs(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const approvePOMutation = useMutation({
+    mutationFn: ({ poId, managerId }) => POService.approvePO(poId, managerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Reject PO (Manager action)
-   */
-  const rejectPO = useCallback(async (poId, managerId = 'Manager User', reason = '') => {
-    try {
-      setError(null);
-      const updated = await POService.rejectPO(poId, managerId, reason);
-      await loadPOs(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const rejectPOMutation = useMutation({
+    mutationFn: ({ poId, managerId, reason }) =>
+      POService.rejectPO(poId, managerId, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Confirm PO to UP
-   */
-  const confirmPOToUP = useCallback(async (poId, userId = 'Ahmed Hassan') => {
-    try {
-      setError(null);
-      const updated = await POService.confirmPOToUP(poId, userId);
-      await loadPOs(); // Refresh
-      return updated;
-    } catch (err) {
-      setError(err.message);
-      throw err;
-    }
-  }, [loadPOs]);
+  const confirmPOToUPMutation = useMutation({
+    mutationFn: ({ poId, userId }) => POService.confirmPOToUP(poId, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pos'] });
+    },
+  });
 
-  /**
-   * Refresh POs
-   */
-  const refresh = useCallback(() => {
-    loadPOs();
-  }, [loadPOs]);
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ['pos'] });
+  };
 
   return {
     pos,
     loading,
-    error,
+    error: error?.message || null,
     filters,
     setFilters,
     getPOById,
     getPOSummary,
-    createPO,
-    linkOrderItemsToPO,
-    requestPOApproval,
-    approvePO,
-    rejectPO,
-    confirmPOToUP,
+    createPO: (orderItemIds = [], userId = 'Ahmed Hassan', poName = null, poDate = null, deliveryDate = null) =>
+      createPOMutation.mutateAsync({ orderItemIds, userId, poName, poDate, deliveryDate }),
+    linkOrderItemsToPO: (poId, orderItemIds, userId = 'Ahmed Hassan') =>
+      linkOrderItemsToPOMutation.mutateAsync({ poId, orderItemIds, userId }),
+    requestPOApproval: (poId, userId = 'Ahmed Hassan') =>
+      requestPOApprovalMutation.mutateAsync({ poId, userId }),
+    approvePO: (poId, managerId = 'Manager User') =>
+      approvePOMutation.mutateAsync({ poId, managerId }),
+    rejectPO: (poId, managerId = 'Manager User', reason = '') =>
+      rejectPOMutation.mutateAsync({ poId, managerId, reason }),
+    confirmPOToUP: (poId, userId = 'Ahmed Hassan') =>
+      confirmPOToUPMutation.mutateAsync({ poId, userId }),
+    checkAndUpdatePOCompletion: (poId) =>
+      POService.checkAndUpdatePOCompletion(poId),
     refresh
   };
 };
 
 export default usePOs;
-

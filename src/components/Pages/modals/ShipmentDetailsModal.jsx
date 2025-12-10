@@ -1,6 +1,5 @@
-import React from 'react';
-import { Modal, StatusBadge } from '../../index.js';
-import { formatNumber, formatDate } from '../../../utils/index.js';
+import { Modal, StatusBadge } from '@/components/index.js';
+import { formatNumber, formatDate } from '@/utils/index.js';
 
 /**
  * Shipment Details Modal Component

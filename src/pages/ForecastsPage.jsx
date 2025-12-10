@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useApp } from '../providers/index.js';
-import { useForecasts } from '../hooks/index.js';
-import { FilterBar, PageHeader, LoadingState, ErrorState } from '../components/index.js';
-import { formatNumber } from '../utils/index.js';
+import { useState, useEffect, Fragment } from 'react';
+import { useApp } from '@/providers/index.js';
+import { useForecasts } from '@/hooks/index.js';
+import { FilterBar, PageHeader, LoadingState, ErrorState } from '@/components/index.js';
+import { formatNumber } from '@/utils/index.js';
 
 /**
  * Forecasts Page Component
@@ -69,7 +69,7 @@ export const ForecastsPage = () => {
             </thead>
             <tbody>
               {Object.entries(forecastsBySKU).map(([skuId, skuData]) => (
-                <React.Fragment key={skuId}>
+                <Fragment key={skuId}>
                   {['forecastQty', 'budgetQty', 'actualQty'].map((type, idx) => (
                     <tr key={`${skuId}-${type}`} className={`${idx === 0 ? 'border-t-2 border-gray-200' : 'border-t border-gray-50'} hover:bg-gray-50/50`}>
                       <td className="sticky left-0 z-10 bg-white px-4 py-2">
@@ -99,7 +99,7 @@ export const ForecastsPage = () => {
                       </td>
                     </tr>
                   ))}
-                </React.Fragment>
+                </Fragment>
               ))}
             </tbody>
           </table>

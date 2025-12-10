@@ -5,21 +5,25 @@ This document shows where all the allocation, shipping, and popup logic is locat
 ## 📍 Main Components & Popups
 
 ### 1. **Order Management Panel** (Main Popup/Sidebar)
-**Location**: `src/components/OrderManagementPanel.jsx`
+**Location**: `src/components/OrderManagement/OrderManagementPanel.jsx`
 
 **What it does**:
 - Main sidebar panel that opens when clicking on order pills in the stock cover table
-- Contains 4 tabs: Details, Actions, Forecast, Shipping
+- Uses UnifiedDetailsTab which combines details and actions in one view
 - Handles all order-related actions in one place
 
 **Features**:
 - ✅ Status change modal
-- ✅ Allocation modal (basic - needs enhancement for partial allocation)
-- ✅ Shipment creation modal
+- ✅ Allocation modal (with partial allocation support)
 - ✅ Forecast update modal
+- ✅ Plan order item modal
+- ✅ Confirm to PO modal (with label selection)
+- ✅ PO approval modal
+- ✅ Regulatory approval/rejection
+- ✅ Edit order item modal
 - ✅ New order creation form
 
-**Status**: ⚠️ **Needs Update** - Currently uses old order model, needs to be updated for OrderItems and POs
+**Status**: ✅ **Complete** - Fully updated for OrderItems and POs
 
 ---
 

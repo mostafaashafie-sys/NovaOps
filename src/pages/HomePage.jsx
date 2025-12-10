@@ -1,27 +1,28 @@
-import React from 'react';
-import { useApp } from '../providers/index.js';
-import { useOrders, useShipments, useStockCover } from '../hooks/index.js';
-import { Card, StatusBadge, PageHeader, LoadingState } from '../components/index.js';
-import { formatNumber } from '../utils/index.js';
+import { useApp } from '@/providers/index.js';
+import { useShipments, useStockCover, useOrderItems, usePOs } from '@/hooks/index.js';
+import { Card, StatusBadge, PageHeader, LoadingState } from '@/components/index.js';
+import { formatNumber } from '@/utils/index.js';
 
 /**
  * Home Page Component
  * Dashboard with key metrics and recent activity
  */
-export const HomePage = () => {
+export const HomePage = ({ onNavigate }) => {
   const { data, loading: appLoading } = useApp();
-  const { orders, loading: ordersLoading } = useOrders();
   const { shipments, loading: shipmentsLoading } = useShipments();
   const { stockCoverData, loading: stockCoverLoading } = useStockCover();
+  const { orderItems, loading: orderItemsLoading } = useOrderItems();
+  const { pos, loading: posLoading } = usePOs();
   
-  const isLoading = appLoading || ordersLoading || shipmentsLoading || stockCoverLoading;
+  const isLoading = appLoading || shipmentsLoading || stockCoverLoading || orderItemsLoading || posLoading;
   
   if (!data || isLoading) {
     return <LoadingState message="Loading dashboard..." />;
   }
   
-  const pendingOrders = orders.filter(o => o.status === 'Submitted').length;
-  const confirmedOrders = orders.filter(o => o.status === 'Confirmed').length;
+  // Calculate order item statistics
+  const pendingPlannedItems = orderItems.filter(oi => oi.status === 'Planned').length;
+  const backOrderItems = orderItems.filter(oi => oi.status === 'Back Order').length;
   const lowStockAlerts = Object.values(stockCoverData || {}).reduce((count, country) => {
     return count + Object.values(country).filter(sku => {
       const latestMonth = Object.values(sku.months || {})[2];
@@ -29,6 +30,10 @@ export const HomePage = () => {
     }).length;
   }, 0);
   const shipmentsInTransit = shipments.filter(s => s.status === 'In Transit').length;
+  
+  // Approval counts
+  const pendingRegulatoryApprovals = orderItems.filter(oi => oi.status === 'Pending Regulatory').length;
+  const pendingPOApprovals = pos.filter(po => po.status === 'Pending CFO Approval').length;
 
   return (
     <div className="space-y-6">
@@ -45,19 +50,47 @@ export const HomePage = () => {
           color="red"
           icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
         />
+        {pendingPlannedItems > 0 && (
+          <Card 
+            title="Planned Items" 
+            value={pendingPlannedItems}
+            subtitle="Order items ready to confirm"
+            color="amber"
+            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
+            onClick={onNavigate ? () => onNavigate('stockcover') : undefined}
+            clickable={true}
+          />
+        )}
+        {pendingRegulatoryApprovals > 0 && (
+          <Card 
+            title="Regulatory Approval" 
+            value={pendingRegulatoryApprovals}
+            subtitle="Labels pending approval"
+            color="orange"
+            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            onClick={onNavigate ? () => onNavigate('regulatory-approval') : undefined}
+            clickable={true}
+          />
+        )}
+        {pendingPOApprovals > 0 && (
+          <Card 
+            title="PO Approval (CFO)" 
+            value={pendingPOApprovals}
+            subtitle="Purchase orders pending"
+            color="purple"
+            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>}
+            onClick={onNavigate ? () => onNavigate('po-approval') : undefined}
+            clickable={true}
+          />
+        )}
         <Card 
-          title="Pending Approvals" 
-          value={pendingOrders}
-          subtitle="Orders awaiting approval"
-          color="amber"
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-        />
-        <Card 
-          title="Confirmed Orders" 
-          value={confirmedOrders}
-          subtitle="Ready for shipment"
+          title="Back Order Items" 
+          value={backOrderItems}
+          subtitle="Ready for allocation"
           color="green"
           icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+          onClick={backOrderItems > 0 && onNavigate ? () => onNavigate('stockcover') : undefined}
+          clickable={backOrderItems > 0}
         />
         <Card 
           title="In Transit" 
@@ -69,19 +102,19 @@ export const HomePage = () => {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Orders */}
+        {/* Recent Order Items */}
         <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h2>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Order Items</h2>
           <div className="space-y-3">
-            {orders.slice(0, 5).map(order => (
-              <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+            {orderItems.slice(0, 5).map(orderItem => (
+              <div key={orderItem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                 <div>
-                  <p className="font-medium text-gray-900">{order.id}</p>
-                  <p className="text-sm text-gray-500">{order.skuName} • {order.countryName}</p>
+                  <p className="font-medium text-gray-900 font-mono text-sm">{orderItem.id}</p>
+                  <p className="text-sm text-gray-500">{orderItem.skuName} • {orderItem.countryName}</p>
                 </div>
                 <div className="text-right">
-                  <StatusBadge status={order.status} />
-                  <p className="text-sm text-gray-400 mt-1">{formatNumber(order.qtyCartons)} cartons</p>
+                  <StatusBadge status={orderItem.status} />
+                  <p className="text-sm text-gray-400 mt-1">{formatNumber(orderItem.qtyCartons)} cartons</p>
                 </div>
               </div>
             ))}

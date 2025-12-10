@@ -1,5 +1,5 @@
-import React, { createContext, useContext } from 'react';
-import { useAppData } from '../hooks/index.js';
+import { createContext, useContext } from 'react';
+import { useAppData } from '@/hooks/index.js';
 
 /**
  * App Context

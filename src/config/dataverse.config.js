@@ -14,26 +14,27 @@ export const DataverseConfig = {
     allocations: 'new_allocations',
     shipments: 'new_shipments',
     inventory: 'new_inventory',
-    settings: 'new_settings'
+    settings: 'new_settings',
+    labels: 'new_labels'
   },
   statusCodes: {
-    // OrderItem Statuses
-    forecasted: 100000000,
-    planned: 100000001,
-    confirmedToUP: 100000002,
-    partiallyAllocated: 100000003,
-    fullyAllocated: 100000004,
-    shipped: 100000005,
-    received: 100000006,
+    // OrderItem Statuses (matching documentation)
+    forecasted: 1,                    // Forecasted
+    planned: 2,                       // Planned
+    pendingRegulatory: 3,            // Pending Regulatory
+    regulatoryApproved: 4,           // Regulatory Approved
+    backOrder: 5,                     // Back Order
+    allocatedToMarket: 6,            // Allocated to Market
+    shippedToMarket: 7,               // Shipped to Market
+    arrivedToMarket: 8,               // Arrived to Market
+    deleted: 9,                       // Deleted
     
-    // PO Statuses
-    poDraft: 200000000,
-    poApprovalRequested: 200000001,
-    poApproved: 200000002,
-    poRejected: 200000003,
-    poConfirmedToUP: 200000004,
-    poShipped: 200000005,
-    poReceived: 200000006
+    // PO Statuses (matching documentation)
+    poDraft: 1,                      // Draft
+    poPendingCFOApproval: 2,         // Pending CFO Approval
+    poCFOApproved: 3,                 // CFO Approved
+    poConfirmedToUP: 4,              // Confirmed to UP
+    poCompleted: 5                    // Completed
   }
 };
 

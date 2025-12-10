@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 /**
  * Navigation Component
@@ -10,7 +10,9 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
   // Use external state if provided, otherwise use internal state
   const isCollapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
   const setIsCollapsed = onToggleCollapse || setInternalCollapsed;
+  // Organized navigation items by category
   const navItems = [
+    // Core Operations
     { 
       id: 'home', 
       label: 'Home', 
@@ -22,22 +24,14 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
     },
     { 
       id: 'stockcover', 
-      label: 'Stock Cover Planning', 
+      label: 'Stock Management', 
       icon: (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
         </svg>
       )
     },
-    { 
-      id: 'orders', 
-      label: 'Order Management', 
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-        </svg>
-      )
-    },
+    // Planning
     { 
       id: 'forecasts', 
       label: 'Forecast Management', 
@@ -47,6 +41,35 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
         </svg>
       )
     },
+    // Approvals (grouped together)
+    { 
+      id: 'regulatory-approval', 
+      label: 'Regulatory Approval', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
+    { 
+      id: 'po-management', 
+      label: 'PO Management', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      )
+    },
+    { 
+      id: 'po-approval', 
+      label: 'PO Approval (CFO)', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      )
+    },
+    // Execution
     { 
       id: 'allocations', 
       label: 'Allocation Management', 
@@ -65,6 +88,7 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
         </svg>
       )
     },
+    // Administrative
     { 
       id: 'reports', 
       label: 'Reports', 
@@ -120,32 +144,50 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
       </div>
       
       <div className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(item => (
-          <button
-            key={item.id}
-            onClick={() => onNavigate(item.id)}
-            className={`w-full flex items-center gap-3 py-3 text-left transition-colors group relative ${
-              isCollapsed ? 'px-3 justify-center' : 'px-5'
-            } ${
-              currentPage === item.id 
-                ? 'bg-blue-600 text-white' 
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-            }`}
-            title={isCollapsed ? item.label : ''}
-          >
-            <span className="flex-shrink-0">{item.icon}</span>
-            {!isCollapsed && (
-              <span className="text-sm font-medium">{item.label}</span>
-            )}
-            {/* Tooltip for collapsed state */}
-            {isCollapsed && (
-              <div className="absolute left-full ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
-                {item.label}
-                <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800"></div>
-              </div>
-            )}
-          </button>
-        ))}
+        {navItems.map((item, index) => {
+          // Add separator before Approvals section (after Forecast Management)
+          const showSeparator = !isCollapsed && index === 3;
+          // Add separator before Administrative section (before Reports)
+          const showSeparator2 = !isCollapsed && index === 8;
+          
+          return (
+            <div key={item.id}>
+              {showSeparator && (
+                <div className="px-5 py-2">
+                  <div className="h-px bg-gray-700"></div>
+                </div>
+              )}
+              {showSeparator2 && (
+                <div className="px-5 py-2">
+                  <div className="h-px bg-gray-700"></div>
+                </div>
+              )}
+              <button
+                onClick={() => onNavigate(item.id)}
+                className={`w-full flex items-center gap-3 py-3 text-left transition-colors group relative ${
+                  isCollapsed ? 'px-3 justify-center' : 'px-5'
+                } ${
+                  currentPage === item.id 
+                    ? 'bg-blue-600 text-white' 
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                }`}
+                title={isCollapsed ? item.label : ''}
+              >
+                <span className="flex-shrink-0">{item.icon}</span>
+                {!isCollapsed && (
+                  <span className="text-sm font-medium">{item.label}</span>
+                )}
+                {/* Tooltip for collapsed state */}
+                {isCollapsed && (
+                  <div className="absolute left-full ml-2 px-3 py-2 bg-gray-800 text-white text-sm rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 shadow-lg">
+                    {item.label}
+                    <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800"></div>
+                  </div>
+                )}
+              </button>
+            </div>
+          );
+        })}
       </div>
       
       <div className={`p-4 border-t border-gray-800 transition-all duration-300 ${isCollapsed ? 'px-3' : ''}`}>

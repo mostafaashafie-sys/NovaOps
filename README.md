@@ -201,15 +201,15 @@ All components are built with Tailwind CSS and follow a consistent design system
 - Services are designed to be easily testable and mockable
 - All business logic is separated from UI components
 
-## 🔄 Migration from Original Files
+## 📚 Documentation
 
-The application has been organized into:
+For detailed information, see:
 
-1. **Service classes** for business logic
-2. **Provider components** for state management
-3. **Reusable components** for UI
-4. **Page components** for each route
-5. **Utility functions** for formatting and helpers
+- **ARCHITECTURE.md** - Complete architecture documentation, folder structure, and layer responsibilities
+- **BUSINESS_LOGIC.md** - Business logic workflow, data models, and user roles
+- **COMPONENT_ORGANIZATION.md** - Component organization guide and import patterns
+- **FEATURE_LOCATION_GUIDE.md** - Guide to finding features and components in the codebase
+- **REUSABLE_COMPONENTS_GUIDE.md** - Guide to reusable UI components and their usage
 
 ## 📄 License
 

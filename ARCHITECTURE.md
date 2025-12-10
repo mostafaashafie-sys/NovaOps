@@ -4,6 +4,120 @@
 
 This application follows a **layered architecture** with clear separation between UI, business logic, and data management.
 
+## Folder Structure
+
+```
+src/
+├── components/
+│   ├── index.js                # Components barrel export
+│   ├── Layout/                 # Layout components
+│   │   └── Navigation.jsx
+│   ├── UI/                     # Basic reusable UI components
+│   │   ├── index.js
+│   │   ├── Button.jsx
+│   │   ├── Input.jsx
+│   │   ├── Select.jsx
+│   │   ├── Modal.jsx
+│   │   ├── StatusBadge.jsx
+│   │   └── ... (12 components)
+│   ├── Shared/                 # Page-level shared components
+│   │   ├── index.js
+│   │   ├── PageHeader.jsx
+│   │   ├── LoadingState.jsx
+│   │   ├── ErrorState.jsx
+│   │   ├── DataTable.jsx
+│   │   ├── FilterBar.jsx
+│   │   └── OrderPill.jsx
+│   ├── OrderManagement/       # Order management feature
+│   │   ├── index.js
+│   │   ├── OrderManagementPanel.jsx
+│   │   ├── components/        # Feature sub-components
+│   │   │   ├── index.js
+│   │   │   ├── useOrderManagement.js
+│   │   │   ├── PanelHeader.jsx
+│   │   │   └── UnifiedDetailsTab.jsx  # Combined details and actions
+│   │   └── modals/            # Feature modals
+│   │       ├── index.js
+│   │       ├── StatusModal.jsx
+│   │       ├── AllocationModal.jsx
+│   │       ├── MultiShipmentModal.jsx
+│   │       ├── ForecastModal.jsx
+│   │       ├── PlanModal.jsx
+│   │       ├── ConfirmToPOModal.jsx
+│   │       ├── POApprovalModal.jsx
+│   │       ├── RegulatoryRejectModal.jsx
+│   │       └── EditOrderItemModal.jsx
+│   └── Pages/                 # Page-specific components
+│       ├── index.js
+│       ├── StockCoverTable.jsx
+│       └── modals/
+│           ├── index.js
+│           ├── OrderDetailsModal.jsx
+│           └── ShipmentDetailsModal.jsx
+├── hooks/                     # Data fetching hooks
+│   ├── index.js
+│   ├── useAppData.js
+│   ├── useOrders.js
+│   ├── useOrderItems.js
+│   ├── usePOs.js
+│   ├── useForecasts.js
+│   ├── useAllocations.js
+│   ├── useShipments.js
+│   ├── useStockCover.js
+│   └── useStockCoverPage.js
+├── services/                  # Business logic services
+│   ├── index.js
+│   ├── DataverseService.js
+│   ├── MockDataService.js
+│   ├── OrderService.js
+│   ├── OrderItemService.js
+│   ├── POService.js
+│   ├── ForecastService.js
+│   ├── AllocationService.js
+│   ├── ShipmentService.js
+│   └── StockCoverService.js
+├── providers/                 # React Context providers
+│   ├── index.js
+│   └── AppProvider.jsx
+├── pages/                     # Page components
+│   ├── index.js
+│   ├── HomePage.jsx
+│   ├── StockCoverPage.jsx
+│   ├── OrdersPage.jsx
+│   ├── ForecastsPage.jsx
+│   ├── AllocationsPage.jsx
+│   └── ShipmentsPage.jsx
+├── utils/                     # Utility functions
+│   ├── index.js
+│   └── formatters.js
+├── config/                    # Configuration
+│   ├── index.js
+│   └── dataverse.config.js
+└── main.jsx                   # Entry point
+```
+
+## Import Patterns
+
+### ✅ Using Barrel Exports (Recommended)
+
+```javascript
+// Import from barrel exports
+import { Button, Modal, StatusBadge, PageHeader } from '../components/index.js';
+import { useOrders, usePOs } from '../hooks/index.js';
+import { OrderService, POService } from '../services/index.js';
+import { formatNumber, formatDate } from '../utils/index.js';
+import { useApp } from '../providers/index.js';
+```
+
+### ❌ Direct Imports (Not Recommended)
+
+```javascript
+// Avoid direct imports
+import Button from '../components/UI/Button.jsx';
+import useOrders from '../hooks/useOrders.js';
+import OrderService from '../services/OrderService.js';
+```
+
 ## Layer Responsibilities
 
 ### 1. Services Layer (`src/services/`)
@@ -243,4 +357,16 @@ When migrating from old code:
 4. Compose → Pages
 
 This ensures proper separation and maintainability.
+
+## Component Organization
+
+Components are organized into clear categories:
+
+- **Layout/**: Application layout components (Navigation)
+- **UI/**: Basic reusable UI building blocks (Button, Input, Modal, etc.)
+- **Shared/**: Page-level shared components (PageHeader, LoadingState, FilterBar, etc.)
+- **OrderManagement/**: Feature-specific components for order management
+- **Pages/**: Page-specific complex components (StockCoverTable, etc.)
+
+See `COMPONENT_ORGANIZATION.md` for detailed component organization guide.
 
