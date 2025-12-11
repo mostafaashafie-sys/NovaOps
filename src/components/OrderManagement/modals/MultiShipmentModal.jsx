@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Modal, StatusBadge } from '@/components/index.js';
-import { formatNumber } from '@/utils/index.js';
+import { Modal, StatusBadge, DatePicker } from '@/components/index.js';
+import { formatNumber, showMessage } from '@/utils/index.js';
 import { useOrderItems, useShipments } from '@/hooks/index.js';
 
 /**
@@ -56,14 +56,14 @@ export const MultiShipmentModal = ({
     e.preventDefault();
     
     if (selectedItems.size === 0) {
-      alert('Please select at least one order item');
+      showMessage.warning('Please select at least one order item');
       return;
     }
-
+    
     try {
       if (shipmentType === 'new') {
         if (!shipDate || !deliveryDate || !carrier || !destination) {
-          alert('Please fill in all required fields for new shipment');
+          showMessage.warning('Please fill in all required fields for new shipment');
           return;
         }
         await onCreateShipment({
@@ -76,14 +76,14 @@ export const MultiShipmentModal = ({
         });
       } else {
         if (!selectedShipmentId) {
-          alert('Please select an existing shipment');
+          showMessage.warning('Please select an existing shipment');
           return;
         }
         await onAddToShipment(selectedShipmentId, Array.from(selectedItems));
       }
       onClose();
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 
@@ -135,8 +135,8 @@ export const MultiShipmentModal = ({
                       <div className="text-xs text-gray-600 mt-1">
                         {item.skuName} • {item.countryName} • {formatNumber(item.qtyCartons)} cartons
                       </div>
-                      {item.poId && (
-                        <div className="text-xs text-indigo-600 mt-1">PO: {item.poId}</div>
+                      {(item.poName || item.poId) && (
+                        <div className="text-xs text-indigo-600 mt-1">PO: {item.poName || item.poId}</div>
                       )}
                     </div>
                   </label>
@@ -200,26 +200,18 @@ export const MultiShipmentModal = ({
         {/* New Shipment Form */}
         {shipmentType === 'new' && (
           <div className="space-y-4 border-t pt-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ship Date *</label>
-              <input
-                type="date"
-                value={shipDate}
-                onChange={(e) => setShipDate(e.target.value)}
-                required
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery Date *</label>
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                required
-                className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            <DatePicker
+              label="Ship Date"
+              value={shipDate}
+              onChange={setShipDate}
+              required
+            />
+            <DatePicker
+              label="Expected Delivery Date"
+              value={deliveryDate}
+              onChange={setDeliveryDate}
+              required
+            />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Destination Country *</label>
               <select

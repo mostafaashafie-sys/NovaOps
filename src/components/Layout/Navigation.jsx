@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LoginButton } from '../Auth/LoginButton.jsx';
 
 /**
  * Navigation Component
@@ -108,6 +109,16 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
         </svg>
       )
     },
+    // Development/Testing
+    { 
+      id: 'dataverse-test', 
+      label: 'Dataverse Test', 
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      )
+    },
   ];
 
   return (
@@ -116,15 +127,16 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
     }`}>
       <div className={`p-5 border-b border-gray-800 transition-all duration-300 ${isCollapsed ? 'px-3' : ''}`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden">
+            <img 
+              src="/FavIcon.png" 
+              alt="NovaOps Logo" 
+              className="w-full h-full object-contain"
+            />
           </div>
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <h1 className="font-bold text-lg">NovaOps</h1>
-              <p className="text-xs text-gray-400">Supply Chain Management</p>
             </div>
           )}
           <button
@@ -149,6 +161,8 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
           const showSeparator = !isCollapsed && index === 3;
           // Add separator before Administrative section (before Reports)
           const showSeparator2 = !isCollapsed && index === 8;
+          // Add separator before Development/Testing section (before Dataverse Test)
+          const showSeparator3 = !isCollapsed && index === 10;
           
           return (
             <div key={item.id}>
@@ -158,6 +172,11 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
                 </div>
               )}
               {showSeparator2 && (
+                <div className="px-5 py-2">
+                  <div className="h-px bg-gray-700"></div>
+                </div>
+              )}
+              {showSeparator3 && (
                 <div className="px-5 py-2">
                   <div className="h-px bg-gray-700"></div>
                 </div>
@@ -191,17 +210,13 @@ export const Navigation = ({ currentPage, onNavigate, isCollapsed: externalColla
       </div>
       
       <div className={`p-4 border-t border-gray-800 transition-all duration-300 ${isCollapsed ? 'px-3' : ''}`}>
-        <div className={`flex items-center gap-3 ${isCollapsed ? 'justify-center' : ''}`}>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-500 flex items-center justify-center text-white font-semibold text-sm flex-shrink-0">
-            AH
+        {!isCollapsed ? (
+          <LoginButton />
+        ) : (
+          <div className="flex justify-center">
+            <LoginButton />
           </div>
-          {!isCollapsed && (
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">Ahmed Hassan</p>
-              <p className="text-xs text-gray-400">Supply Planner</p>
-            </div>
-          )}
-        </div>
+        )}
       </div>
     </nav>
   );

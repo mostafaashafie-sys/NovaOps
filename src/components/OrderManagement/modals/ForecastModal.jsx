@@ -25,7 +25,7 @@ export const ForecastModal = ({
       });
       onClose();
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 

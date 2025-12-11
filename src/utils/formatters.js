@@ -33,12 +33,14 @@ export const formatDateTime = (dateStr) => {
   });
 };
 
+import { UI } from '@/config/app.constants.js';
+
 export const getCoverColor = (value) => {
   if (value === null || value === undefined) return '#e5e7eb';
-  if (value < 2) return '#ef4444';
-  if (value < 3) return '#f59e0b';
-  if (value < 4) return '#22c55e';
-  return '#3b82f6';
+  if (value < 1) return UI.COLORS.COVER.LOW;      // Red (< 1 month)
+  if (value < 3) return UI.COLORS.COVER.MEDIUM;  // Orange (1-3 months)
+  if (value < 6) return UI.COLORS.COVER.GOOD;    // Green (3-6 months)
+  return UI.COLORS.COVER.HIGH;                    // Blue (> 6 months)
 };
 
 export const getCoverTextColor = (value) => {
@@ -52,6 +54,7 @@ export const getStatusColor = (status) => {
     'Planned': { bg: '#dbeafe', text: '#1e40af', border: '#93c5fd' },
     'Pending Regulatory': { bg: '#fef3c7', text: '#92400e', border: '#fcd34d' },
     'Regulatory Approved': { bg: '#d1fae5', text: '#065f46', border: '#6ee7b7' },
+    'Order Approved': { bg: '#a7f3d0', text: '#047857', border: '#34d399' }, // Darker green for CFO approval
     'Back Order': { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },
     'Allocated to Market': { bg: '#cffafe', text: '#155e75', border: '#67e8f9' },
     'Shipped to Market': { bg: '#e0e7ff', text: '#3730a3', border: '#a5b4fc' },

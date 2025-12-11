@@ -6,6 +6,6 @@
 export { default as PageHeader } from './PageHeader.jsx';
 export { default as LoadingState } from './LoadingState.jsx';
 export { default as ErrorState } from './ErrorState.jsx';
-export { default as DataTable } from './DataTable.jsx';
 export { default as FilterBar } from './FilterBar.jsx';
 export { default as OrderPill } from './OrderPill.jsx';
+export { default as PODetailsModal } from './PODetailsModal.jsx';

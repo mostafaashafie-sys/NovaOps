@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { StatusBadge, EmptyState } from '@/components/index.js';
-import { formatNumber, formatDateTime } from '@/utils/index.js';
+import { StatusBadge, EmptyState, ToggleButton } from '@/components/index.js';
+import { formatNumber, formatDateTime, showMessage } from '@/utils/index.js';
 import { useOrderItems, useStockCover } from '@/hooks/index.js';
 import { useApp } from '@/providers/index.js';
 
@@ -167,7 +167,12 @@ export const UnifiedDetailsTab = ({
           color: 'yellow',
           disabled: true
         });
-      } else if (po.status === 'CFO Approved') {
+      }
+    }
+
+    // Order Approved actions (after CFO approves PO)
+    if (currentStatus === 'Order Approved' && orderItem.poId && po) {
+      if (po.status === 'CFO Approved') {
         actions.push({
           id: 'waiting-confirm-to-up',
           label: 'CFO Approved - Ready for UP',
@@ -241,13 +246,13 @@ export const UnifiedDetailsTab = ({
         await refreshStockCover();
         
         if (onOrderCreated) {
-          onOrderCreated(newOrderItem);
+          await onOrderCreated(newOrderItem);
         }
         setIsCreating(false);
         setFormData({ qtyCartons: '', channel: 'Private', tender: false, comments: '' });
       } catch (err) {
         console.error('Error creating order:', err);
-        alert('Failed to create order: ' + err.message);
+        showMessage.error('Failed to create order: ' + err.message);
         setIsCreating(false);
       }
     };
@@ -303,15 +308,15 @@ export const UnifiedDetailsTab = ({
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="tender"
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold text-gray-700">Tender</span>
+              <ToggleButton
+                label="Tender"
                 checked={formData.tender}
-                onChange={(e) => setFormData({ ...formData, tender: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                onChange={(checked) => setFormData({ ...formData, tender: checked })}
+                variant="default"
+                size="sm"
               />
-              <label htmlFor="tender" className="text-sm text-gray-700">Tender</label>
             </div>
 
             <div>
@@ -328,9 +333,22 @@ export const UnifiedDetailsTab = ({
             <button
               type="submit"
               disabled={isCreating || !formData.qtyCartons}
-              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-semibold transition-colors shadow-md"
+              className="w-full px-5 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all shadow-lg hover:shadow-xl disabled:shadow-none transform hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isCreating ? 'Creating...' : 'Create Order'}
+              {isCreating ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Creating...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="text-lg">➕</span>
+                  Create Order
+                </span>
+              )}
             </button>
           </form>
         </div>
@@ -442,10 +460,10 @@ export const UnifiedDetailsTab = ({
               <span className="text-gray-600">Status:</span>
               <StatusBadge status={orderItem.status} />
             </div>
-            {orderItem.poId && (
+            {(orderItem.poName || orderItem.poId) && (
               <div className="flex justify-between items-center py-2">
                 <span className="text-gray-600">PO:</span>
-                <span className="font-mono text-sm font-semibold text-indigo-600">{orderItem.poId}</span>
+                <span className="font-mono text-sm font-semibold text-indigo-600">{orderItem.poName || orderItem.poId}</span>
               </div>
             )}
           </div>

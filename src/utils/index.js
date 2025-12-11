@@ -4,5 +4,9 @@
  */
 
 export * from './formatters.js';
-export { default as logger, Logger, LOG_LEVELS } from './logger.js';
+export * from './theme.js';
+// Legacy logger export for backward compatibility
+export { default as logger } from '@/services/LoggerService.js';
+export { Logger, LoggerConfig } from '@/services/LoggerService.js';
+export { default as showMessage } from './message.js';
 

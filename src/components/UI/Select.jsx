@@ -1,7 +1,9 @@
+import { Select as AntSelect } from 'antd';
 
 /**
  * Select Component
- * Reusable select dropdown with label and error support
+ * Reusable select dropdown with label and error support using Ant Design
+ * Maintains same API as custom Select for backward compatibility
  */
 export const Select = ({
   label,
@@ -17,40 +19,57 @@ export const Select = ({
   className = '',
   ...props
 }) => {
-  const selectId = name || `select-${Math.random().toString(36).substring(7)}`;
+  // Convert options to Ant Design format
+  const selectOptions = options.map(option => {
+    if (typeof option === 'string') {
+      return { label: option, value: option };
+    }
+    return { label: option.label, value: option.value };
+  });
+  
+  // Handle onChange to match native select behavior
+  const handleChange = (selectedValue) => {
+    if (onChange) {
+      // Check if onChange expects an event object (native select) or direct value
+      // Try to call with event first, fallback to direct value
+      try {
+        const event = {
+          target: {
+            name: name,
+            value: selectedValue
+          },
+          currentTarget: {
+            name: name,
+            value: selectedValue
+          }
+        };
+        onChange(event);
+      } catch (err) {
+        // If event format fails, try direct value
+        onChange(selectedValue);
+      }
+    }
+  };
   
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={selectId} className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
           {label}
           {required && <span className="text-red-500 ml-1">*</span>}
         </label>
       )}
-      <select
-        id={selectId}
-        name={name}
-        value={value}
-        onChange={onChange}
-        required={required}
+      <AntSelect
+        value={value || undefined}
+        onChange={handleChange}
+        placeholder={placeholder}
         disabled={disabled}
-        className={`w-full px-4 py-2 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors ${
-          error ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
-        } ${disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white'} ${className}`}
+        options={selectOptions}
+        className={className}
+        status={error ? 'error' : ''}
+        style={{ width: '100%' }}
         {...props}
-      >
-        {placeholder && <option value="">{placeholder}</option>}
-        {options.map(option => {
-          if (typeof option === 'string') {
-            return <option key={option} value={option}>{option}</option>;
-          }
-          return (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          );
-        })}
-      </select>
+      />
       {error && (
         <p className="mt-1 text-sm text-red-600">{error}</p>
       )}

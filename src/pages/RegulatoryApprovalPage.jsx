@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { Table } from 'antd';
 import { useApp } from '@/providers/index.js';
 import { useOrderItems, usePOs } from '@/hooks/index.js';
-import { PageHeader, StatusBadge, DataTable, LoadingState, ErrorState, Modal } from '@/components/index.js';
-import { formatNumber, formatDate } from '@/utils/index.js';
+import { PageHeader, StatusBadge, LoadingState, ErrorState, Modal } from '@/components/index.js';
+import { formatNumber, formatDate, showMessage } from '@/utils/index.js';
 import { OrderItemService } from '@/services/index.js';
 
 /**
@@ -25,9 +26,9 @@ export const RegulatoryApprovalPage = () => {
     try {
       await approveRegulatoryLabel(orderItemId, 'Regulatory Office');
       refresh();
-      alert('Label approved successfully');
+      showMessage.success('Label approved successfully');
     } catch (err) {
-      alert('Error approving label: ' + err.message);
+      showMessage.error('Error approving label: ' + err.message);
     } finally {
       setProcessing(false);
     }
@@ -42,39 +43,70 @@ export const RegulatoryApprovalPage = () => {
       setShowRejectModal(false);
       setSelectedOrderItem(null);
       setRejectReason('');
-      alert('Label rejected. Order item returned to Planned status.');
+      showMessage.success('Label rejected. Order item returned to Planned status.');
     } catch (err) {
-      alert('Error rejecting label: ' + err.message);
+      showMessage.error('Error rejecting label: ' + err.message);
     } finally {
       setProcessing(false);
     }
   };
 
   const columns = [
-    { label: 'Order Item ID', className: 'font-mono' },
-    { label: 'SKU' },
-    { label: 'Country' },
-    { label: 'Quantity' },
-    { label: 'Label' },
-    { label: 'PO' },
-    { label: 'Delivery Month' },
-    { label: 'Actions', className: 'text-center' }
-  ];
-
-  const renderRow = (item) => (
-    <>
-      <td className="px-4 py-3 font-mono text-sm">{item.id}</td>
-      <td className="px-4 py-3 font-medium">{item.skuName}</td>
-      <td className="px-4 py-3">{item.countryName}</td>
-      <td className="px-4 py-3 font-semibold text-blue-600">{formatNumber(item.qtyCartons)} cartons</td>
-      <td className="px-4 py-3">
+    {
+      title: 'Order Item ID',
+      dataIndex: 'id',
+      key: 'id',
+      className: 'font-mono',
+      sorter: (a, b) => a.id.localeCompare(b.id),
+    },
+    {
+      title: 'SKU',
+      dataIndex: 'skuName',
+      key: 'skuName',
+      sorter: (a, b) => a.skuName.localeCompare(b.skuName),
+    },
+    {
+      title: 'Country',
+      dataIndex: 'countryName',
+      key: 'countryName',
+      sorter: (a, b) => a.countryName.localeCompare(b.countryName),
+    },
+    {
+      title: 'Quantity',
+      key: 'quantity',
+      render: (_, item) => (
+        <span className="font-semibold text-blue-600">{formatNumber(item.qtyCartons)} cartons</span>
+      ),
+      sorter: (a, b) => a.qtyCartons - b.qtyCartons,
+    },
+    {
+      title: 'Label',
+      dataIndex: 'labelId',
+      key: 'labelId',
+      render: (labelId) => (
         <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">
-          {item.labelId || 'N/A'}
+          {labelId || 'N/A'}
         </span>
-      </td>
-      <td className="px-4 py-3 font-mono text-sm text-indigo-600">{item.poId || '—'}</td>
-      <td className="px-4 py-3">{item.deliveryMonth}</td>
-      <td className="px-4 py-3">
+      ),
+    },
+    {
+      title: 'PO',
+      dataIndex: 'poId',
+      key: 'poId',
+      className: 'font-mono',
+      render: (poId) => <span className="text-indigo-600">{poId || '—'}</span>,
+    },
+    {
+      title: 'Delivery Month',
+      dataIndex: 'deliveryMonth',
+      key: 'deliveryMonth',
+      sorter: (a, b) => a.deliveryMonth.localeCompare(b.deliveryMonth),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      className: 'text-center',
+      render: (_, item) => (
         <div className="flex items-center justify-center gap-2">
           <button
             onClick={() => handleApprove(item.id)}
@@ -94,9 +126,9 @@ export const RegulatoryApprovalPage = () => {
             Reject
           </button>
         </div>
-      </td>
-    </>
-  );
+      ),
+    },
+  ];
 
   if (loading) {
     return <LoadingState message="Loading pending approvals..." />;
@@ -140,12 +172,15 @@ export const RegulatoryApprovalPage = () => {
             <p className="text-sm">No order items pending regulatory approval</p>
           </div>
         ) : (
-          <DataTable
-            columns={columns}
-            data={pendingItems}
-            renderRow={renderRow}
-            emptyMessage="No items pending approval"
-          />
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={pendingItems}
+              rowKey="id"
+              pagination={{ pageSize: 10, showSizeChanger: true }}
+              locale={{ emptyText: 'No items pending approval' }}
+            />
+          </div>
         )}
       </div>
 

@@ -10,7 +10,7 @@ import {
   AllocationModal, 
   ForecastModal, 
   PlanModal, 
-  ConfirmToPOModal, 
+  ConfirmToPOWizard, 
   RegulatoryRejectModal,
   EditOrderItemModal
 } from './modals/index.js';
@@ -28,7 +28,8 @@ export const OrderManagementPanel = ({
   countryId, 
   skuId, 
   monthKey,
-  onCreateOrder 
+  onCreateOrder,
+  onOrderCreated
 }) => {
   const { data } = useApp();
   const { pos, checkAndUpdatePOCompletion, refresh: refreshPOs } = usePOs();
@@ -114,10 +115,21 @@ export const OrderManagementPanel = ({
               monthKey={monthKey}
               po={po}
               onOrderCreated={async (newOrderItem) => {
+                // Refresh the order item in the panel
                 await loadOrderItem();
+                // Call parent's onOrderCreated to refresh data and close panel
+                if (onOrderCreated) {
+                  await onOrderCreated(newOrderItem);
+                }
               }}
               onPlan={() => setShowPlanModal(true)}
-              onConfirmToPO={() => setShowConfirmToPOModal(true)}
+              onConfirmToPO={async () => {
+                // Ensure order item is loaded before opening wizard
+                if (orderItemId) {
+                  await loadOrderItem();
+                }
+                setShowConfirmToPOModal(true);
+              }}
               onAllocate={() => {
                 resetAllocationForm();
                 setShowAllocateModal(true);
@@ -132,7 +144,7 @@ export const OrderManagementPanel = ({
                       await refreshPOs();
                     }
                   } catch (err) {
-                    alert(err.message);
+                    showMessage.error(err.message);
                   }
                 } else {
                   setShowStatusModal(true);
@@ -142,7 +154,7 @@ export const OrderManagementPanel = ({
                 try {
                   await handleApproveRegulatory();
                 } catch (err) {
-                  alert(err.message);
+                  showMessage.error(err.message);
                 }
               }}
               onRejectRegulatory={() => setShowRegulatoryRejectModal(true)}
@@ -151,7 +163,7 @@ export const OrderManagementPanel = ({
                 try {
                   await handleDeleteOrderItem();
                 } catch (err) {
-                  alert(err.message);
+                  showMessage.error(err.message);
                 }
               }}
             />
@@ -203,7 +215,7 @@ export const OrderManagementPanel = ({
         onPlanOrderItem={handlePlanOrderItem}
       />
 
-      <ConfirmToPOModal
+      <ConfirmToPOWizard
         isOpen={showConfirmToPOModal}
         onClose={() => setShowConfirmToPOModal(false)}
         orderItem={orderItem}

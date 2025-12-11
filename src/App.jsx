@@ -1,6 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { App as AntApp } from 'antd';
+import { useMsal } from '@azure/msal-react';
 import { AppProvider } from '@/providers/index.js';
 import { Navigation } from '@/components/index.js';
+import { initMessageApi } from '@/utils/message.js';
 import { 
   HomePage, 
   StockManagementPage, 
@@ -11,7 +14,9 @@ import {
   POApprovalPage,
   POManagementPage,
   ReportsPage,
-  SettingsPage
+  SettingsPage,
+  DataverseTestPage,
+  LandingPage
 } from '@/pages/index.js';
 
 /**
@@ -19,10 +24,30 @@ import {
  * Root component that manages routing and page navigation
  */
 function App() {
+  const { message } = AntApp.useApp();
+  const { accounts, inProgress } = useMsal();
   const [currentPage, setCurrentPage] = useState('home');
   const [createOrderData, setCreateOrderData] = useState(null);
   const [viewOrderId, setViewOrderId] = useState(null);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  // Check if user is authenticated
+  const isAuthenticated = accounts.length > 0;
+
+  // Initialize message API for showMessage utility
+  useEffect(() => {
+    initMessageApi(message);
+  }, [message]);
+
+  // Show landing page if not authenticated and not in the middle of authentication
+  if (!isAuthenticated && inProgress === 'none') {
+    return (
+      <AppProvider>
+        <LandingPage />
+      </AppProvider>
+    );
+  }
+
 
   const handleCreateOrder = (orderData) => {
     setCreateOrderData(orderData);
@@ -56,6 +81,8 @@ function App() {
         return <ReportsPage />;
       case 'settings':
         return <SettingsPage />;
+      case 'dataverse-test':
+        return <DataverseTestPage />;
       default:
         return <HomePage />;
     }

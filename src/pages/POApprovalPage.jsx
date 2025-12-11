@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { Table } from 'antd';
 import { useApp } from '@/providers/index.js';
 import { usePOs, useOrderItems } from '@/hooks/index.js';
-import { PageHeader, StatusBadge, DataTable, LoadingState, ErrorState, Modal } from '@/components/index.js';
-import { formatNumber, formatDate } from '@/utils/index.js';
+import { PageHeader, StatusBadge, LoadingState, ErrorState, Modal, PODetailsModal } from '@/components/index.js';
+import { formatNumber, formatDate, showMessage } from '@/utils/index.js';
 
 /**
  * PO Approval Page
@@ -10,13 +11,21 @@ import { formatNumber, formatDate } from '@/utils/index.js';
  */
 export const POApprovalPage = () => {
   const { data } = useApp();
-  const { pos, loading, error, refresh, approvePO, rejectPO, confirmPOToUP } = usePOs();
-  const { orderItems } = useOrderItems();
+  const { pos, loading, error, refresh, approvePO, rejectPO, confirmPOToUP, getPOById } = usePOs();
+  const { orderItems, refresh: refreshOrderItems } = useOrderItems();
   const [selectedPO, setSelectedPO] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  // Refresh data when modal opens to ensure we have latest PO and order items
+  useEffect(() => {
+    if (showDetailsModal && selectedPO) {
+      refresh();
+      refreshOrderItems();
+    }
+  }, [showDetailsModal, selectedPO?.id]);
 
   // Filter POs that are pending CFO approval
   const pendingPOs = pos.filter(po => po.status === 'Pending CFO Approval');
@@ -26,9 +35,9 @@ export const POApprovalPage = () => {
     try {
       await approvePO(poId, 'CFO User');
       refresh();
-      alert('PO approved successfully');
+      showMessage.success('PO approved successfully');
     } catch (err) {
-      alert('Error approving PO: ' + err.message);
+      showMessage.error('Error approving PO: ' + err.message);
     } finally {
       setProcessing(false);
     }
@@ -43,47 +52,65 @@ export const POApprovalPage = () => {
       setShowRejectModal(false);
       setSelectedPO(null);
       setRejectReason('');
-      alert('PO rejected. Status returned to Draft.');
+      showMessage.success('PO rejected. Status returned to Draft.');
     } catch (err) {
-      alert('Error rejecting PO: ' + err.message);
+      showMessage.error('Error rejecting PO: ' + err.message);
     } finally {
       setProcessing(false);
     }
   };
 
-  const getPOOrderItems = (poId) => {
-    return orderItems.filter(oi => oi.poId === poId);
+  const getPOOrderItems = (po) => {
+    // Use PO's orderItemIds as source of truth, fallback to filtering by poId
+    if (po?.orderItemIds && po.orderItemIds.length > 0) {
+      return orderItems.filter(oi => po.orderItemIds.includes(oi.id));
+    }
+    // Fallback: filter by poId (for backward compatibility)
+    return orderItems.filter(oi => oi.poId === po?.id || oi.poId === po);
   };
 
-  const calculatePOTotal = (poId) => {
-    const items = getPOOrderItems(poId);
-    return items.reduce((sum, item) => sum + item.qtyCartons, 0);
+  const calculatePOTotal = (po) => {
+    const items = getPOOrderItems(po);
+    return items.reduce((sum, item) => sum + (item.qtyCartons || 0), 0);
   };
 
   const columns = [
-    { label: 'PO Number', className: 'font-mono' },
-    { label: 'Status' },
-    { label: 'Items' },
-    { label: 'Total Quantity' },
-    { label: 'Countries' },
-    { label: 'Requested On' },
-    { label: 'Actions', className: 'text-center' }
-  ];
-
-  const renderRow = (po) => {
-    const poItems = getPOOrderItems(po.id);
-    const totalQty = calculatePOTotal(po.id);
-    const countries = [...new Set(poItems.map(item => item.countryName))];
-
-    return (
-      <>
-        <td className="px-4 py-3 font-mono text-sm font-semibold">{po.id}</td>
-        <td className="px-4 py-3">
-          <StatusBadge status={po.status} />
-        </td>
-        <td className="px-4 py-3">{poItems.length} items</td>
-        <td className="px-4 py-3 font-semibold text-blue-600">{formatNumber(totalQty)} cartons</td>
-        <td className="px-4 py-3">
+    {
+      title: 'PO Number',
+      dataIndex: 'id',
+      key: 'id',
+      className: 'font-mono',
+      sorter: (a, b) => a.id.localeCompare(b.id),
+    },
+    {
+      title: 'Status',
+      key: 'status',
+      render: (_, po) => <StatusBadge status={po.status} />,
+    },
+    {
+      title: 'Items',
+      key: 'items',
+      render: (_, po) => {
+        const poItems = getPOOrderItems(po);
+        return `${poItems.length} items`;
+      },
+    },
+    {
+      title: 'Total Quantity',
+      key: 'totalQty',
+      render: (_, po) => {
+        const totalQty = calculatePOTotal(po);
+        return <span className="font-semibold text-blue-600">{formatNumber(totalQty)} cartons</span>;
+      },
+      sorter: (a, b) => calculatePOTotal(a) - calculatePOTotal(b),
+    },
+    {
+      title: 'Countries',
+      key: 'countries',
+      render: (_, po) => {
+        const poItems = getPOOrderItems(po);
+        const countries = [...new Set(poItems.map(item => item.countryName))];
+        return (
           <div className="flex flex-wrap gap-1">
             {countries.slice(0, 2).map(country => (
               <span key={country} className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">
@@ -96,41 +123,54 @@ export const POApprovalPage = () => {
               </span>
             )}
           </div>
-        </td>
-        <td className="px-4 py-3 text-gray-600">{formatDate(po.requestedOn)}</td>
-        <td className="px-4 py-3">
-          <div className="flex items-center justify-center gap-2">
-            <button
-              onClick={() => {
-                setSelectedPO(po);
-                setShowDetailsModal(true);
-              }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
-            >
-              View
-            </button>
-            <button
-              onClick={() => handleApprove(po.id)}
-              disabled={processing}
-              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm rounded-lg font-medium transition-colors"
-            >
-              Approve
-            </button>
-            <button
-              onClick={() => {
-                setSelectedPO(po);
-                setShowRejectModal(true);
-              }}
-              disabled={processing}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white text-sm rounded-lg font-medium transition-colors"
-            >
-              Reject
-            </button>
-          </div>
-        </td>
-      </>
-    );
-  };
+        );
+      },
+    },
+    {
+      title: 'Requested On',
+      dataIndex: 'requestedOn',
+      key: 'requestedOn',
+      render: (date) => formatDate(date),
+      sorter: (a, b) => new Date(a.requestedOn) - new Date(b.requestedOn),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      className: 'text-center',
+      render: (_, po) => (
+        <div className="flex items-center justify-center gap-2">
+          <button
+            onClick={async () => {
+              const fullPO = await getPOById(po.id);
+              setSelectedPO(fullPO);
+              setShowDetailsModal(true);
+              refreshOrderItems();
+            }}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
+          >
+            View
+          </button>
+          <button
+            onClick={() => handleApprove(po.id)}
+            disabled={processing}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-sm rounded-lg font-medium transition-colors"
+          >
+            Approve
+          </button>
+          <button
+            onClick={() => {
+              setSelectedPO(po);
+              setShowRejectModal(true);
+            }}
+            disabled={processing}
+            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white text-sm rounded-lg font-medium transition-colors"
+          >
+            Reject
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   if (loading) {
     return <LoadingState message="Loading pending approvals..." />;
@@ -175,136 +215,66 @@ export const POApprovalPage = () => {
             <p className="text-sm">No purchase orders pending CFO approval</p>
           </div>
         ) : (
-          <DataTable
-            columns={columns}
-            data={pendingPOs}
-            renderRow={renderRow}
-            emptyMessage="No POs pending approval"
-          />
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <Table
+              columns={columns}
+              dataSource={pendingPOs}
+              rowKey="id"
+              pagination={{ pageSize: 10, showSizeChanger: true }}
+              locale={{ emptyText: 'No POs pending approval' }}
+            />
+          </div>
         )}
       </div>
 
       {/* PO Details Modal */}
-      <Modal
+      <PODetailsModal
         isOpen={showDetailsModal}
         onClose={() => {
           setShowDetailsModal(false);
           setSelectedPO(null);
         }}
-        title={selectedPO ? `PO Details: ${selectedPO.id}` : "PO Details"}
-        size="lg"
-      >
-        {selectedPO && (() => {
-          const poItems = getPOOrderItems(selectedPO.id);
-          const totalQty = calculatePOTotal(selectedPO.id);
-          const allRegulatoryApproved = poItems.every(item => item.status === 'Regulatory Approved');
-
-          return (
-            <div className="space-y-4">
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-gray-600">PO Number:</span>
-                    <span className="ml-2 font-mono font-semibold">{selectedPO.id}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Status:</span>
-                    <span className="ml-2"><StatusBadge status={selectedPO.status} /></span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Items:</span>
-                    <span className="ml-2 font-semibold">{poItems.length}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Total Quantity:</span>
-                    <span className="ml-2 font-semibold text-blue-600">{formatNumber(totalQty)} cartons</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Requested On:</span>
-                    <span className="ml-2">{formatDate(selectedPO.requestedOn)}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-600">Requested By:</span>
-                    <span className="ml-2">{selectedPO.requestedBy || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {!allRegulatoryApproved && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800 font-medium mb-1">⚠️ Cannot Approve</p>
-                  <p className="text-xs text-yellow-700">
-                    {poItems.filter(item => item.status !== 'Regulatory Approved').length} order item(s) are not Regulatory Approved. 
-                    All items must be Regulatory Approved before approving the PO.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Order Items ({poItems.length})</h4>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {poItems.map(item => (
-                    <div key={item.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-mono text-sm font-semibold">{item.id}</span>
-                        <StatusBadge status={item.status} />
-                      </div>
-                      <div className="grid grid-cols-3 gap-2 text-xs text-gray-600">
-                        <div>
-                          <span className="font-medium">SKU:</span> {item.skuName}
-                        </div>
-                        <div>
-                          <span className="font-medium">Country:</span> {item.countryName}
-                        </div>
-                        <div>
-                          <span className="font-medium">Qty:</span> {formatNumber(item.qtyCartons)} cartons
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
+        po={selectedPO}
+        orderItems={orderItems}
+        showWarnings={true}
+        actions={[
+          {
+            label: 'Close',
+            onClick: () => {
+              setShowDetailsModal(false);
+              setSelectedPO(null);
+            },
+            variant: 'default'
+          },
+          ...(selectedPO ? (() => {
+            const poItems = getPOOrderItems(selectedPO);
+            const allRegulatoryApproved = poItems.every(item => item.status === 'Regulatory Approved');
+            if (allRegulatoryApproved) {
+              return [
+                {
+                  label: processing ? 'Approving...' : 'Approve PO',
+                  onClick: () => {
                     setShowDetailsModal(false);
-                    setSelectedPO(null);
-                  }}
-                  className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg hover:bg-gray-50 font-medium transition-colors"
-                >
-                  Close
-                </button>
-                {allRegulatoryApproved && (
-                  <>
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        handleApprove(selectedPO.id);
-                      }}
-                      disabled={processing}
-                      className="flex-1 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium transition-colors shadow-md disabled:opacity-50"
-                    >
-                      {processing ? 'Approving...' : 'Approve PO'}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowDetailsModal(false);
-                        setShowRejectModal(true);
-                      }}
-                      disabled={processing}
-                      className="flex-1 px-4 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium transition-colors shadow-md disabled:opacity-50"
-                    >
-                      Reject PO
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          );
-        })()}
-      </Modal>
+                    handleApprove(selectedPO.id);
+                  },
+                  disabled: processing,
+                  variant: 'success'
+                },
+                {
+                  label: 'Reject PO',
+                  onClick: () => {
+                    setShowDetailsModal(false);
+                    setShowRejectModal(true);
+                  },
+                  disabled: processing,
+                  variant: 'danger'
+                }
+              ];
+            }
+            return [];
+          })() : [])
+        ]}
+      />
 
       {/* Reject Modal */}
       <Modal
@@ -332,11 +302,11 @@ export const POApprovalPage = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Items:</span>
-                <span className="font-medium">{getPOOrderItems(selectedPO.id).length}</span>
+                <span className="font-medium">{getPOOrderItems(selectedPO).length}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Total Quantity:</span>
-                <span className="font-medium">{formatNumber(calculatePOTotal(selectedPO.id))} cartons</span>
+                <span className="font-medium">{formatNumber(calculatePOTotal(selectedPO))} cartons</span>
               </div>
             </div>
 

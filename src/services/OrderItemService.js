@@ -1,5 +1,4 @@
-import DataverseService from './DataverseService.js';
-import MockDataService from './MockDataService.js';
+import DataverseDataService from './DataverseDataService.js';
 import { DataverseConfig } from '@/config/index.js';
 import { Logger } from '@/utils/index.js';
 
@@ -10,194 +9,83 @@ const logger = new Logger('OrderItemService');
  * Handles order item business logic (forecasted items, planning, linking to POs)
  */
 class OrderItemService {
-  constructor(useMock = true) {
-    this.useMock = useMock;
-    this.dataverseService = DataverseService;
-    this.mockData = useMock ? MockDataService.generateMockData() : null;
+  constructor() {
+    this.dataverseService = DataverseDataService;
   }
 
   /**
    * Get all order items with optional filters
    */
   async getOrderItems(filters = {}) {
-    if (this.useMock) {
-      let orderItems = this.mockData.orderItems || [];
-      
-      if (filters.countryId) {
-        orderItems = orderItems.filter(oi => oi.countryId === filters.countryId);
-      }
-      if (filters.skuId) {
-        orderItems = orderItems.filter(oi => oi.skuId === filters.skuId);
-      }
-      if (filters.status) {
-        orderItems = orderItems.filter(oi => oi.status === filters.status);
-      }
-      if (filters.poId) {
-        orderItems = orderItems.filter(oi => oi.poId === filters.poId);
-      }
-      if (filters.deliveryMonth) {
-        orderItems = orderItems.filter(oi => oi.deliveryMonth === filters.deliveryMonth);
-      }
-      
-      return orderItems;
+    const result = await this.dataverseService.getOrderItems(filters);
+    
+    // Log what data we received
+    logger.info('OrderItems data received from Dataverse', {
+      count: Array.isArray(result) ? result.length : 'not an array',
+      filters: filters,
+      sample: Array.isArray(result) && result.length > 0 ? result[0] : null,
+      allFields: Array.isArray(result) && result.length > 0 ? Object.keys(result[0]) : []
+    });
+    
+    if (Array.isArray(result) && result.length === 0) {
+      logger.warn('OrderItems: Dataverse returned empty array - table may be empty or query returned no results', {
+        filters: filters,
+        table: 'new_orderitemses'
+      });
     }
     
-    return this.dataverseService.getOrderItems(filters);
+    return result;
   }
 
   /**
    * Get order item by ID
    */
   async getOrderItemById(orderItemId) {
-    if (this.useMock) {
-      return (this.mockData.orderItems || []).find(oi => oi.id === orderItemId) || null;
-    }
-    
-    return this.dataverseService.fetch(`/${DataverseConfig.tables.orderItems}(${orderItemId})`);
+    return this.dataverseService.getOrderItemById(orderItemId);
   }
 
   /**
-   * Plan a forecasted order item (change status to Planned)
+   * Plan a forecasted order item (change status to Planned By LO)
    * This only links to PO, does not confirm to PO
    */
   async planOrderItem(orderItemId, poId, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (orderItem) {
-        if (orderItem.status !== 'Forecasted') {
-          throw new Error('Only forecasted order items can be planned');
-        }
-        orderItem.status = 'Planned';
-        orderItem.poId = poId;
-        orderItem.modifiedBy = userId;
-        orderItem.modifiedOn = new Date().toISOString();
-        if (!orderItem.history) orderItem.history = [];
-        orderItem.history.push({
-          action: 'Planned',
-          by: userId,
-          date: new Date().toISOString()
-        });
-      }
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: 'Planned',
-      poId: poId,
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      orderPlacementStatus: 100000001, // Planned By LO
+      orderId: poId
     });
   }
 
   /**
    * Confirm order item to PO with label selection
-   * Changes status: Planned → Pending Regulatory
+   * Changes status: Planned By LO → Confirmed Pending RO Approval
    * Requires label selection
    */
   async confirmOrderItemToPO(orderItemId, labelId, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (!orderItem) {
-        throw new Error('Order item not found');
-      }
-      if (orderItem.status !== 'Planned') {
-        throw new Error('Only planned order items can be confirmed to PO');
-      }
-      if (!labelId) {
-        throw new Error('Label selection is required to confirm order item to PO');
-      }
-      
-      orderItem.status = 'Pending Regulatory';
-      orderItem.labelId = labelId;
-      orderItem.modifiedBy = userId;
-      orderItem.modifiedOn = new Date().toISOString();
-      if (!orderItem.history) orderItem.history = [];
-      orderItem.history.push({
-        action: 'Confirmed to PO - Pending Regulatory',
-        by: userId,
-        date: new Date().toISOString(),
-        labelId: labelId
-      });
-      
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: 'Pending Regulatory',
-      labelId: labelId,
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      orderPlacementStatus: 100000002, // Confirmed Pending RO Approval
+      labelId: labelId
     });
   }
 
   /**
    * Approve regulatory label (Regulatory Office action)
-   * Changes status: Pending Regulatory → Regulatory Approved
+   * Changes status: Confirmed Pending RO Approval → RO Approved Pending CFO Approval
    */
   async approveRegulatoryLabel(orderItemId, userId = 'Regulatory Office') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (!orderItem) {
-        throw new Error('Order item not found');
-      }
-      if (orderItem.status !== 'Pending Regulatory') {
-        throw new Error('Only order items with Pending Regulatory status can be approved');
-      }
-      
-      orderItem.status = 'Regulatory Approved';
-      orderItem.modifiedBy = userId;
-      orderItem.modifiedOn = new Date().toISOString();
-      if (!orderItem.history) orderItem.history = [];
-      orderItem.history.push({
-        action: 'Regulatory Approved',
-        by: userId,
-        date: new Date().toISOString()
-      });
-      
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: 'Regulatory Approved',
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      orderPlacementStatus: 100000003 // RO Approved Pending CFO Approval
     });
   }
 
   /**
    * Reject regulatory label (Regulatory Office action)
-   * Changes status: Pending Regulatory → Planned
+   * Changes status: Confirmed Pending RO Approval → Planned By LO
    */
   async rejectRegulatoryLabel(orderItemId, reason = '', userId = 'Regulatory Office') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (!orderItem) {
-        throw new Error('Order item not found');
-      }
-      if (orderItem.status !== 'Pending Regulatory') {
-        throw new Error('Only order items with Pending Regulatory status can be rejected');
-      }
-      
-      orderItem.status = 'Planned';
-      orderItem.labelId = null; // Remove label on rejection
-      orderItem.modifiedBy = userId;
-      orderItem.modifiedOn = new Date().toISOString();
-      if (!orderItem.history) orderItem.history = [];
-      orderItem.history.push({
-        action: 'Regulatory Rejected',
-        by: userId,
-        date: new Date().toISOString(),
-        reason: reason
-      });
-      
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: 'Planned',
+      orderPlacementStatus: 100000001, // Planned By LO
       labelId: null,
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      comments: reason ? `Rejected: ${reason}` : undefined
     });
   }
 
@@ -206,52 +94,6 @@ class OrderItemService {
    * Only allowed for Forecasted and Planned items
    */
   async updateOrderItem(orderItemId, updates, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (!orderItem) {
-        throw new Error('Order item not found');
-      }
-      
-      // Only allow editing for Forecasted and Planned items
-      if (orderItem.status !== 'Forecasted' && orderItem.status !== 'Planned') {
-        throw new Error('Only Forecasted and Planned order items can be edited');
-      }
-      
-      const changes = [];
-      const wasForecasted = orderItem.status === 'Forecasted';
-      
-      if (updates.qtyCartons !== undefined && updates.qtyCartons !== orderItem.qtyCartons) {
-        const oldQty = orderItem.qtyCartons;
-        orderItem.qtyCartons = updates.qtyCartons;
-        changes.push(`Quantity: ${oldQty} → ${updates.qtyCartons}`);
-      }
-      
-      if (updates.deliveryMonth !== undefined && updates.deliveryMonth !== orderItem.deliveryMonth) {
-        const oldMonth = orderItem.deliveryMonth;
-        orderItem.deliveryMonth = updates.deliveryMonth;
-        changes.push(`Delivery Month: ${oldMonth} → ${updates.deliveryMonth}`);
-      }
-      
-      // If user edits a Forecasted item, it becomes Planned (per lifecycle logic)
-      if (wasForecasted && changes.length > 0) {
-        orderItem.status = 'Planned';
-        changes.push('Status: Forecasted → Planned (edited by user)');
-      }
-      
-      if (changes.length > 0) {
-        orderItem.modifiedBy = userId;
-        orderItem.modifiedOn = new Date().toISOString();
-        if (!orderItem.history) orderItem.history = [];
-        orderItem.history.push({
-          action: `Updated: ${changes.join(', ')}`,
-          by: userId,
-          date: new Date().toISOString()
-        });
-      }
-      
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
       ...updates,
       modifiedBy: userId,
@@ -261,28 +103,11 @@ class OrderItemService {
 
   /**
    * Update order item status
+   * newStatus should be the status code (e.g., 100000001 for Planned By LO)
    */
   async updateOrderItemStatus(orderItemId, newStatus, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (orderItem) {
-        orderItem.status = newStatus;
-        orderItem.modifiedBy = userId;
-        orderItem.modifiedOn = new Date().toISOString();
-        if (!orderItem.history) orderItem.history = [];
-        orderItem.history.push({
-          action: newStatus,
-          by: userId,
-          date: new Date().toISOString()
-        });
-      }
-      return orderItem;
-    }
-    
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: newStatus,
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      orderPlacementStatus: newStatus
     });
   }
 
@@ -290,42 +115,39 @@ class OrderItemService {
    * Create order item from forecast (when pushing remaining quantity)
    */
   async createOrderItemFromPush(originalOrderItemId, newDeliveryMonth, remainingQty, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const original = (this.mockData.orderItems || []).find(oi => oi.id === originalOrderItemId);
-      if (!original) {
-        throw new Error('Original order item not found');
-      }
-      
-      const newOrderItem = {
-        id: `OI-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        countryId: original.countryId,
-        countryName: original.countryName,
-        skuId: original.skuId,
-        skuName: original.skuName,
-        status: 'Back Order', // Pushed items start as Back Order (not Planned)
-        qtyCartons: remainingQty,
-        deliveryMonth: newDeliveryMonth,
-        poId: original.poId, // Linked to same PO
-        originalOrderItemId: originalOrderItemId,
-        isSystemGenerated: false,
-        channel: original.channel || 'Private',
-        tender: original.tender || false,
-        comments: `Pushed from ${original.id}`,
-        createdBy: userId,
-        createdOn: new Date().toISOString(),
-        modifiedBy: userId,
-        modifiedOn: new Date().toISOString(),
-        history: [{
-          action: 'Created from Push',
-          by: userId,
-          date: new Date().toISOString()
-        }]
-      };
-      
-      if (!this.mockData.orderItems) this.mockData.orderItems = [];
-      this.mockData.orderItems.push(newOrderItem);
-      return newOrderItem;
+    // Get original order item to copy its properties
+    const original = await this.getOrderItemById(originalOrderItemId);
+    if (!original) {
+      throw new Error('Original order item not found');
     }
+    
+    // Parse delivery month (format: YYYY-MM)
+    const [year, month] = newDeliveryMonth.split('-').map(Number);
+    
+    // Get SKU metadata to calculate qtyInCartons
+    let tinsPerCarton = 1;
+    if (original.skuId) {
+      try {
+        const sku = await this.dataverseService.getSkuForCalculation(original.skuId);
+        tinsPerCarton = sku.tinsPerCarton;
+      } catch (error) {
+        logger.warn('Could not get SKU metadata, using default tinsPerCarton=1', error);
+      }
+    }
+    
+    const newOrderItem = {
+      countryId: original.countryId,
+      skuId: original.skuId,
+      orderId: original.orderId, // Linked to same PO
+      orderItemQty: remainingQty,
+      // qtyInCartons will be calculated by DataverseDataService.createOrderItem
+      orderPlacementStatus: 100000006, // Back Order
+      month: month,
+      year: year,
+      date: `${newDeliveryMonth}-01`, // First day of month
+      channel: original.channel || 100000000, // Private
+      comments: `Pushed from ${original.id}`
+    };
     
     return this.dataverseService.createOrderItem(newOrderItem);
   }
@@ -334,100 +156,82 @@ class OrderItemService {
    * Get forecasted order items (system-generated)
    */
   async getForecastedOrderItems(filters = {}) {
-    return this.getOrderItems({ ...filters, status: 'Forecasted' });
+    return this.getOrderItems({ ...filters, orderPlacementStatus: 100000000 }); // System Forecasted Order
   }
 
   /**
    * Get planned order items
    */
   async getPlannedOrderItems(filters = {}) {
-    return this.getOrderItems({ ...filters, status: 'Planned' });
+    return this.getOrderItems({ ...filters, orderPlacementStatus: 100000001 }); // Planned By LO
   }
 
   /**
    * Get order items with Back Order status
    */
   async getBackOrderItems(filters = {}) {
-    return this.getOrderItems({ ...filters, status: 'Back Order' });
+    return this.getOrderItems({ ...filters, orderPlacementStatus: 100000006 }); // Back Order
   }
 
   /**
    * Get order items pending regulatory approval
    */
   async getPendingRegulatoryItems(filters = {}) {
-    return this.getOrderItems({ ...filters, status: 'Pending Regulatory' });
+    return this.getOrderItems({ ...filters, orderPlacementStatus: 100000002 }); // Confirmed Pending RO Approval
   }
 
   /**
    * Get order items with regulatory approved status
    */
   async getRegulatoryApprovedItems(filters = {}) {
-    return this.getOrderItems({ ...filters, status: 'Regulatory Approved' });
+    return this.getOrderItems({ ...filters, orderPlacementStatus: 100000003 }); // RO Approved Pending CFO Approval
   }
 
   /**
    * Create a new order item
    */
   async createOrderItem(orderItemData) {
-    if (this.useMock) {
-      const newOrderItem = {
-        id: `OI-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        ...orderItemData,
-        status: orderItemData.status || 'Draft',
-        isSystemGenerated: false,
-        createdOn: new Date().toISOString(),
-        modifiedOn: new Date().toISOString(),
-        createdBy: orderItemData.createdBy || 'Ahmed Hassan',
-        modifiedBy: orderItemData.modifiedBy || 'Ahmed Hassan',
-        history: [{
-          action: 'Created',
-          by: orderItemData.createdBy || 'Ahmed Hassan',
-          date: new Date().toISOString()
-        }]
-      };
-      
-      if (!this.mockData.orderItems) this.mockData.orderItems = [];
-      this.mockData.orderItems.push(newOrderItem);
-      return newOrderItem;
+    // Ensure required fields are set
+    const newOrderItem = {
+      ...orderItemData,
+      orderPlacementStatus: orderItemData.orderPlacementStatus || 100000000, // System Forecasted Order
+      channel: orderItemData.channel || 100000000 // Private
+    };
+    
+    // Parse deliveryMonth if provided (format: YYYY-MM)
+    if (orderItemData.deliveryMonth && !orderItemData.month) {
+      const [year, month] = orderItemData.deliveryMonth.split('-').map(Number);
+      newOrderItem.year = year;
+      newOrderItem.month = month;
+      newOrderItem.date = `${orderItemData.deliveryMonth}-01`;
     }
     
-    return this.dataverseService.createOrderItem(orderItemData);
+    return this.dataverseService.createOrderItem(newOrderItem);
   }
 
   /**
    * Delete order item (only allowed for Forecasted and Planned items)
-   * Changes status to 'Deleted' instead of removing from array (for tracking)
+   * Note: In Dataverse, we typically don't delete records, but mark them as inactive
+   * This method updates the status instead
    */
   async deleteOrderItem(orderItemId, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      if (!orderItem) {
-        throw new Error('Order item not found');
-      }
-      
-      // Only allow deletion for Forecasted and Planned items
-      if (orderItem.status !== 'Forecasted' && orderItem.status !== 'Planned') {
-        throw new Error('Only Forecasted and Planned order items can be deleted');
-      }
-      
-      // Change status to Deleted (don't remove from array for tracking)
-      orderItem.status = 'Deleted';
-      orderItem.modifiedBy = userId;
-      orderItem.modifiedOn = new Date().toISOString();
-      if (!orderItem.history) orderItem.history = [];
-      orderItem.history.push({
-        action: 'Deleted',
-        by: userId,
-        date: new Date().toISOString()
-      });
-      
-      return orderItem;
+    // Get current order item to check status
+    const orderItem = await this.getOrderItemById(orderItemId);
+    if (!orderItem) {
+      throw new Error('Order item not found');
     }
     
+    // Only allow deletion for System Forecasted or Planned items
+    const allowedStatuses = [100000000, 100000001]; // System Forecasted Order, Planned By LO
+    if (!allowedStatuses.includes(orderItem.orderPlacementStatus)) {
+      throw new Error('Only System Forecasted or Planned order items can be deleted');
+    }
+    
+    // In Dataverse, we might set status to inactive or a deleted status
+    // For now, we'll update status to a "deleted" state if such exists
+    // Otherwise, we could use statecode/statuscode
     return this.dataverseService.updateOrderItem(orderItemId, {
-      status: 'Deleted',
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      comments: `Deleted by ${userId} on ${new Date().toISOString()}`
     });
   }
 
@@ -438,56 +242,20 @@ class OrderItemService {
     logger.action('updateOrderItemDeliveryMonth called', {
       orderItemId,
       newDeliveryMonth,
-      userId,
-      useMock: this.useMock
+      userId
     });
     
-    if (this.useMock) {
-      const orderItem = (this.mockData.orderItems || []).find(oi => oi.id === orderItemId);
-      
-      if (!orderItem) {
-        logger.error('Order item not found', { orderItemId });
-        throw new Error(`Order item ${orderItemId} not found`);
-      }
-      
-      logger.data('Found order item', {
-        orderItemId: orderItem.id,
-        currentDeliveryMonth: orderItem.deliveryMonth,
-        newDeliveryMonth,
-        status: orderItem.status,
-        qtyCartons: orderItem.qtyCartons
-      });
-      
-      const oldMonth = orderItem.deliveryMonth;
-      orderItem.deliveryMonth = newDeliveryMonth;
-      orderItem.modifiedBy = userId;
-      orderItem.modifiedOn = new Date().toISOString();
-      
-      if (!orderItem.history) orderItem.history = [];
-      orderItem.history.push({
-        action: `Delivery month changed from ${oldMonth} to ${newDeliveryMonth}`,
-        by: userId,
-        date: new Date().toISOString()
-      });
-      
-      logger.success('Order item updated successfully', {
-        orderItemId: orderItem.id,
-        oldMonth,
-        newMonth: orderItem.deliveryMonth,
-        historyEntries: orderItem.history.length
-      });
-      
-      return orderItem;
-    }
+    // Parse delivery month (format: YYYY-MM)
+    const [year, month] = newDeliveryMonth.split('-').map(Number);
     
     logger.network('Using Dataverse service to update order item');
     return this.dataverseService.updateOrderItem(orderItemId, {
-      deliveryMonth: newDeliveryMonth,
-      modifiedBy: userId,
-      modifiedOn: new Date().toISOString()
+      year: year,
+      month: month,
+      date: `${newDeliveryMonth}-01`
     });
   }
 }
 
-export default new OrderItemService(true); // Use mock by default
+export default new OrderItemService();
 

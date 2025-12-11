@@ -4,8 +4,10 @@
  */
 
 export { default as AllocationsPage } from './AllocationsPage.jsx';
+export { default as DataverseTestPage } from './DataverseTestPage.jsx';
 export { default as ForecastsPage } from './ForecastsPage.jsx';
 export { default as HomePage } from './HomePage.jsx';
+export { LandingPage } from './LandingPage.jsx';
 export { default as POApprovalPage } from './POApprovalPage.jsx';
 export { default as POManagementPage } from './POManagementPage.jsx';
 export { default as RegulatoryApprovalPage } from './RegulatoryApprovalPage.jsx';

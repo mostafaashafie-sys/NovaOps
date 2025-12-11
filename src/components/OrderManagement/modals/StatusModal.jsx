@@ -1,5 +1,5 @@
 import { Modal, StatusBadge } from '@/components/index.js';
-import { formatNumber } from '@/utils/index.js';
+import { formatNumber, showMessage } from '@/utils/index.js';
 
 /**
  * Status Change Modal Component
@@ -11,6 +11,7 @@ export const StatusModal = ({ isOpen, onClose, orderItem, onStatusChange }) => {
     'Planned',
     'Pending Regulatory',
     'Regulatory Approved',
+    'Order Approved',
     'Back Order',
     'Allocated to Market',
     'Shipped to Market',
@@ -23,7 +24,7 @@ export const StatusModal = ({ isOpen, onClose, orderItem, onStatusChange }) => {
       await onStatusChange(status);
       onClose();
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 

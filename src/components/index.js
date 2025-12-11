@@ -18,3 +18,6 @@ export * from './OrderManagement/index.js';
 // Page Components (re-export)
 export * from './Pages/index.js';
 
+// Stock Management Components (re-export)
+export * from './StockManagement/index.js';
+

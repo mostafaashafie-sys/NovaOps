@@ -27,7 +27,7 @@ export const SettingsPage = () => {
     localStorage.setItem('appSettings', JSON.stringify(settings));
     setTimeout(() => {
       setIsSaving(false);
-      alert('Settings saved successfully!');
+      showMessage.success('Settings saved successfully!');
     }, 500);
   };
 

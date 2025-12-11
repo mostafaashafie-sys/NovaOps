@@ -68,7 +68,24 @@ export const ForecastsPage = () => {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(forecastsBySKU).map(([skuId, skuData]) => (
+              {Object.entries(forecastsBySKU)
+                .sort(([skuIdA], [skuIdB]) => {
+                  const skuA = data?.skus.find(s => s.id === skuIdA);
+                  const skuB = data?.skus.find(s => s.id === skuIdB);
+                  const sortOrderA = skuA?.sortOrder != null ? skuA.sortOrder : Number.MAX_SAFE_INTEGER;
+                  const sortOrderB = skuB?.sortOrder != null ? skuB.sortOrder : Number.MAX_SAFE_INTEGER;
+                  
+                  // First sort by sortOrder
+                  if (sortOrderA !== sortOrderB) {
+                    return sortOrderA - sortOrderB;
+                  }
+                  
+                  // If sortOrder is the same (or both null), fallback to name
+                  const nameA = skuA?.name || skuIdA;
+                  const nameB = skuB?.name || skuIdB;
+                  return nameA.localeCompare(nameB);
+                })
+                .map(([skuId, skuData]) => (
                 <Fragment key={skuId}>
                   {['forecastQty', 'budgetQty', 'actualQty'].map((type, idx) => (
                     <tr key={`${skuId}-${type}`} className={`${idx === 0 ? 'border-t-2 border-gray-200' : 'border-t border-gray-50'} hover:bg-gray-50/50`}>

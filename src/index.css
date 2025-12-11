@@ -2,6 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom Ant Design Button Variants */
+.ant-btn-success {
+  background-color: #16a34a;
+  border-color: #16a34a;
+  color: #fff;
+}
+
+.ant-btn-success:hover:not(:disabled) {
+  background-color: #15803d;
+  border-color: #15803d;
+}
+
+.ant-btn-danger {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.ant-btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.ant-btn-warning {
+  background-color: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
+.ant-btn-warning:hover:not(:disabled) {
+  background-color: #d97706;
+  border-color: #d97706;
+}
+
+.ant-btn-gradient {
+  background: linear-gradient(to right, #3b82f6, #2563eb);
+  border: none;
+  color: #fff;
+}
+
+.ant-btn-gradient:hover:not(:disabled) {
+  background: linear-gradient(to right, #2563eb, #1d4ed8);
+}
+
 /* Base styles to ensure Tailwind is working */
 body {
   margin: 0;

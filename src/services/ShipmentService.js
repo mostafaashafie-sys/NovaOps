@@ -1,35 +1,22 @@
-import DataverseService from './DataverseService.js';
-import MockDataService from './MockDataService.js';
+import DataverseDataService from './DataverseDataService.js';
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('ShipmentService');
 
 /**
  * Shipment Service
  * Handles shipment-related business logic
  */
 class ShipmentService {
-  constructor(useMock = true) {
-    this.useMock = useMock;
-    this.dataverseService = DataverseService;
-    this.mockData = useMock ? MockDataService.generateMockData() : null;
+  constructor() {
+    this.dataverseService = DataverseDataService;
   }
 
   /**
    * Get shipments with optional filters
    */
   async getShipments(filters = {}) {
-    if (this.useMock) {
-      let shipments = this.mockData.shipments;
-      
-      if (filters.countryId) {
-        shipments = shipments.filter(s => s.countryId === filters.countryId);
-      }
-      if (filters.status) {
-        shipments = shipments.filter(s => s.status === filters.status);
-      }
-      
-      return shipments;
-    }
-    
-    return this.dataverseService.getShipments(filters);
+    return await this.dataverseService.getShipments(filters);
   }
 
   /**
@@ -37,86 +24,46 @@ class ShipmentService {
    * Supports single orderItemId (legacy) or orderItemIds array (new)
    */
   async createShipment(shipmentData) {
-    if (this.useMock) {
-      const orderItemIds = shipmentData.orderItemIds || (shipmentData.orderItemId ? [shipmentData.orderItemId] : []);
-      
-      const newShipment = {
-        id: `SH-2025-${String(this.mockData.shipments.length + 1).padStart(3, '0')}`,
-        shipmentNumber: `SHIP-${String(this.mockData.shipments.length + 1).padStart(4, '0')}`,
-        ...shipmentData,
-        orderItemIds: orderItemIds, // Array of order item IDs
-        orderItemId: orderItemIds[0] || shipmentData.orderItemId, // Keep for backward compatibility
-        status: 'Shipped to Market',
-        trackingNumber: `TRK${Math.random().toString(36).substring(2, 10).toUpperCase()}`
-      };
-      
-      // Update order items to "Shipped to Market"
-      if (this.mockData.orderItems && orderItemIds.length > 0) {
-        orderItemIds.forEach(orderItemId => {
-          const orderItem = this.mockData.orderItems.find(oi => oi.id === orderItemId);
-          if (orderItem && orderItem.status === 'Allocated to Market') {
-            orderItem.status = 'Shipped to Market';
-            orderItem.modifiedOn = new Date().toISOString();
-            if (!orderItem.history) orderItem.history = [];
-            orderItem.history.push({
-              action: 'Shipped to Market',
-              by: shipmentData.createdBy || 'System',
-              date: new Date().toISOString(),
-              shipmentId: newShipment.id
-            });
-          }
-        });
-      }
-      
-      this.mockData.shipments.push(newShipment);
-      return newShipment;
+    const orderItemIds = shipmentData.orderItemIds || (shipmentData.orderItemId ? [shipmentData.orderItemId] : []);
+    
+    const newShipment = {
+      ...shipmentData,
+      status: 100000001 // In Transit
+    };
+    
+    const shipment = await this.dataverseService.createShipment(newShipment);
+    
+    // Link order items to shipment
+    if (orderItemIds && orderItemIds.length > 0) {
+      const OrderItemService = (await import('./OrderItemService.js')).default;
+      await Promise.all(orderItemIds.map(orderItemId => 
+        OrderItemService.updateOrderItem(orderItemId, { shippingId: shipment.id })
+      ));
     }
     
-    // In production, create in Dataverse
-    return null;
+    return shipment;
   }
 
   /**
    * Add order items to existing shipment
    */
   async addOrderItemsToShipment(shipmentId, orderItemIds, userId = 'Ahmed Hassan') {
-    if (this.useMock) {
-      const shipment = this.mockData.shipments.find(s => s.id === shipmentId);
-      if (!shipment) {
-        throw new Error('Shipment not found');
-      }
-      
-      if (shipment.status !== 'Shipped to Market') {
-        throw new Error('Can only add items to shipments with status "Shipped to Market"');
-      }
-      
-      // Add order item IDs to shipment
-      const existingIds = shipment.orderItemIds || (shipment.orderItemId ? [shipment.orderItemId] : []);
-      shipment.orderItemIds = [...new Set([...existingIds, ...orderItemIds])];
-      
-      // Update order items to "Shipped to Market"
-      if (this.mockData.orderItems && orderItemIds.length > 0) {
-        orderItemIds.forEach(orderItemId => {
-          const orderItem = this.mockData.orderItems.find(oi => oi.id === orderItemId);
-          if (orderItem && orderItem.status === 'Allocated to Market') {
-            orderItem.status = 'Shipped to Market';
-            orderItem.modifiedOn = new Date().toISOString();
-            if (!orderItem.history) orderItem.history = [];
-            orderItem.history.push({
-              action: 'Added to Shipment',
-              by: userId,
-              date: new Date().toISOString(),
-              shipmentId: shipment.id
-            });
-          }
-        });
-      }
-      
-      return shipment;
+    const shipment = await this.dataverseService.getShipmentById(shipmentId);
+    if (!shipment) {
+      throw new Error('Shipment not found');
     }
     
-    // In production, update in Dataverse
-    return null;
+    if (shipment.status !== 100000001) { // In Transit
+      throw new Error('Can only add items to shipments with status "In Transit"');
+    }
+    
+    // Link order items to shipment
+    const OrderItemService = (await import('./OrderItemService.js')).default;
+    await Promise.all(orderItemIds.map(orderItemId => 
+      OrderItemService.updateOrderItem(orderItemId, { shippingId: shipmentId })
+    ));
+    
+    return await this.dataverseService.getShipmentById(shipmentId);
   }
 
   /**
@@ -124,75 +71,31 @@ class ShipmentService {
    * Also updates order items and checks PO completion
    */
   async updateShipmentStatus(shipmentId, newStatus) {
-    if (this.useMock) {
-      const shipment = this.mockData.shipments.find(s => s.id === shipmentId);
-      if (shipment) {
-        // Map old status names to new ones if needed
-        if (newStatus === 'Delivered' || newStatus === 'Received') {
-          shipment.status = 'Arrived to Market';
-        } else if (newStatus === 'Shipped to Market' || newStatus === 'In Transit') {
-          shipment.status = 'Shipped to Market';
-        } else {
-          shipment.status = newStatus;
-        }
-        
-        if (shipment.status === 'Arrived to Market') {
-          shipment.deliveryDate = new Date().toISOString();
-          
-          // Update order items in this shipment to "Arrived to Market"
-          const orderItemIds = shipment.orderItemIds || (shipment.orderItemId ? [shipment.orderItemId] : []);
-          const completedPOIds = new Set();
-          
-          if (this.mockData.orderItems && orderItemIds.length > 0) {
-            orderItemIds.forEach(orderItemId => {
-              const orderItem = this.mockData.orderItems.find(oi => oi.id === orderItemId);
-              if (orderItem && orderItem.status === 'Shipped to Market') {
-                orderItem.status = 'Arrived to Market';
-                orderItem.modifiedOn = new Date().toISOString();
-                if (!orderItem.history) orderItem.history = [];
-                orderItem.history.push({
-                  action: 'Arrived to Market',
-                  by: 'System',
-                  date: new Date().toISOString()
-                });
-                
-                // Track PO IDs to check completion
-                if (orderItem.poId) {
-                  completedPOIds.add(orderItem.poId);
-                }
-              }
-            });
-          }
-          
-          // Check PO completion for all affected POs
-          if (completedPOIds.size > 0) {
-            completedPOIds.forEach(poId => {
-              POService.checkAndUpdatePOCompletion(poId);
-            });
-          }
-          
-          // Update shipment status to "Completed" if all items arrived
-          const allItemsArrived = orderItemIds.every(orderItemId => {
-            const item = this.mockData.orderItems.find(oi => oi.id === orderItemId);
-            return item && item.status === 'Arrived to Market';
-          });
-          
-          if (allItemsArrived && orderItemIds.length > 0) {
-            shipment.status = 'Completed';
-            if (!shipment.history) shipment.history = [];
-            shipment.history.push({
-              action: 'Completed - All items arrived',
-              by: 'System',
-              date: new Date().toISOString()
-            });
-          }
-        }
-      }
-      return shipment;
+    // Map status codes
+    let statusCode;
+    if (newStatus === 'Delivered' || newStatus === 'Received' || newStatus === 100000002) {
+      statusCode = 100000002; // Delivered
+    } else if (newStatus === 'In Transit' || newStatus === 100000001) {
+      statusCode = 100000001; // In Transit
+    } else {
+      statusCode = newStatus;
     }
     
-    // In production, update in Dataverse
-    return null;
+    const updateData = { status: statusCode };
+    if (statusCode === 100000002) { // Delivered
+      updateData.deliveryDate = new Date().toISOString();
+      
+      // Update linked order items to "Shipped To Market" (100000009)
+      const shipment = await this.dataverseService.getShipmentById(shipmentId);
+      if (shipment && shipment.orderItems) {
+        const OrderItemService = (await import('./OrderItemService.js')).default;
+        await Promise.all(shipment.orderItems.map(oi => 
+          OrderItemService.updateOrderItemStatus(oi.id, 100000009) // Shipped To Market
+        ));
+      }
+    }
+    
+    return await this.dataverseService.updateShipment(shipmentId, updateData);
   }
 
   /**
@@ -203,5 +106,5 @@ class ShipmentService {
   }
 }
 
-export default new ShipmentService(true); // Use mock by default
+export default new ShipmentService();
 

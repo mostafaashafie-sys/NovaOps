@@ -1,0 +1,453 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Dataverse Schema Configuration",
+  "description": "Complete Dataverse schema structure based on DATAVERSE_SCHEMA_MAPPING.md",
+  "version": "1.0.0",
+  "tables": {
+    "countries": {
+      "tableName": "new_countrytables",
+      "primaryKey": "new_countrytableid",
+      "columns": {
+        "id": "new_countrytableid",
+        "name": "new_countryname",
+        "countryId": "new_countryid",
+        "region": "new_region",
+        "currency": "new_currency",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {
+        "currency": {
+          "1": "Saudi Riyal (SAR)",
+          "2": "Yemeni Rial (YER)",
+          "3": "UAE Dirham (AED)",
+          "4": "Bahraini Dinar (BHD)",
+          "5": "Kuwaiti Dinar (KWD)",
+          "6": "Omani Rial (OMR)",
+          "7": "Qatari Riyal (QAR)",
+          "8": "Lebanese Pound (LBP)",
+          "9": "Iraqi Dinar (IQD)",
+          "10": "US Dollar (USD)"
+        },
+        "region": {
+          "100000000": "GCC",
+          "100000001": "Levant"
+        }
+      },
+      "defaultSelect": ["new_countrytableid", "new_countryname", "new_countryid", "new_region", "new_currency"]
+    },
+    "skus": {
+      "tableName": "new_skutables",
+      "primaryKey": "new_skutableid",
+      "columns": {
+        "id": "new_skutableid",
+        "name": "new_skuname",
+        "skuId": "new_skuid",
+        "category": "new_skucategory",
+        "tinSize": "new_tinsize",
+        "tinsPerCarton": "new_numberoftinspercarton",
+        "diseaseArea": "new_diseasearea",
+        "sortOrder": "new_sortorder",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {},
+      "filterFields": {},
+      "statusCodes": {
+        "diseaseArea": {
+          "100000000": "Infant Formula",
+          "100000001": "Follow-on Formula",
+          "100000002": "Growing-up Formula",
+          "100000003": "Allergy Formula",
+          "100000004": "Constipation Formula",
+          "100000005": "Regurgitation Formula",
+          "100000006": "Diarrhea Formula",
+          "100000007": "Colic Formula"
+        },
+        "category": {
+          "1": "Standard",
+          "2": "Genio",
+          "3": "Special",
+          "4": "RTF",
+          "5": "Gimmicks"
+        },
+        "status": {
+          "1": "Active",
+          "2": "Inactive",
+          "3": "Archived"
+        }
+      },
+      "defaultSelect": ["new_skutableid", "new_skuname", "new_skuid", "new_skucategory", "new_tinsize", "new_numberoftinspercarton", "new_sortorder"]
+    },
+    "orders": {
+      "tableName": "new_orderses", // With 'es' - verified from Dataverse API service document
+      "primaryKey": "new_ordersid",
+      "columns": {
+        "id": "new_ordersid",
+        "name": "new_orderid",
+        "date": "new_date",
+        "deliveryDate": "new_deliverydate",
+        "month": "new_month",
+        "year": "new_year",
+        "orderStatus": "new_status",
+        "poId": "new_poid",
+        "totalOrderQty": "new_totalorderqty",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "destination": "new_Destination@odata.bind"
+      },
+      "filterFields": {
+        "destination": "_new_destination_value"
+      },
+      "statusCodes": {
+        "orderStatus": {
+          "100000000": "Open",
+          "100000001": "Pending CFO Approval",
+          "100000002": "Approved",
+          "100000003": "Completed",
+          "100000004": "Confirmed to UP"
+        }
+      },
+      "defaultSelect": ["new_ordersid", "new_orderid", "new_date", "new_deliverydate", "new_status", "new_poid", "new_totalorderqty", "new_month", "new_year"]
+    },
+    "orderItems": {
+      "tableName": "new_orderitemses",
+      "primaryKey": "new_orderitemsid",
+      "columns": {
+        "id": "new_orderitemsid",
+        "name": "new_orderitemid",
+        "channel": "new_channel",
+        "date": "new_date",
+        "month": "new_month",
+        "year": "new_year",
+        "orderItemQty": "new_orderitemqty",
+        "qtyInCartons": "new_qtyincartons",
+        "allocatedQty": "new_allocatedquantity",
+        "remainingQty": "new_remainingquantity",
+        "orderPlacementStatus": "new_orderplacementstatus",
+        "orderStatus": "new_orderstatus",
+        "tender": "new_tender",
+        "upCode": "new_upcode",
+        "comments": "new_comments",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind",
+        "order": "new_Order@odata.bind",
+        "shipping": "new_ShippingID@odata.bind",
+        "label": "new_Label@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value",
+        "order": "_new_order_value",
+        "shipping": "_new_shippingid_value",
+        "label": "_new_label_value"
+      },
+      "statusCodes": {
+        "orderPlacementStatus": {
+          "100000000": "System Forecasted Order",
+          "100000001": "Planned By LO",
+          "100000002": "Confirmed Pending RO Approval",
+          "100000003": "RO Approved Pending CFO Approval",
+          "100000004": "Approved",
+          "100000005": "Confirmed to UP",
+          "100000006": "Back Order",
+          "100000007": "Allocation Pending RO Approval",
+          "100000008": "Allocated To Market",
+          "100000009": "Shipped To Market",
+          "100000010": "Remaining For Shipping",
+          "100000011": "Completed",
+          "100000012": "Item Approved Pending PO Approval"
+        },
+        "channel": {
+          "100000000": "Private",
+          "100000001": "Tender",
+          "100000002": "Offers"
+        }
+      },
+      "defaultSelect": ["new_orderitemsid", "new_orderitemid", "new_orderitemqty", "new_qtyincartons", "new_orderplacementstatus", "new_channel", "new_month", "new_year", "_new_country_value", "_new_sku_value", "_new_order_value"]
+    },
+    "forecasts": {
+      "tableName": "new_forecasttables",
+      "primaryKey": "new_forecasttableid",
+      "columns": {
+        "id": "new_forecasttableid",
+        "name": "new_forecastid",
+        "forecastQty": "new_forecastquantity",
+        "forecastQtyCartons": "new_forecastquantityincartons",
+        "forecastStatus": "new_forecaststatus",
+        "channel": "new_channel",
+        "month": "new_month",
+        "year": "new_year",
+        "monthYear": "new_monthyear",
+        "systemGeneratedOrder": "new_systemgeneratedorder",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {
+        "forecastStatus": {
+          "100000000": "Submitted",
+          "100000001": "Approved",
+          "100000002": "System Forecasted"
+        },
+        "channel": {
+          "100000000": "Private",
+          "100000001": "Tender",
+          "100000002": "Offers"
+        }
+      },
+      "defaultSelect": ["new_forecasttableid", "new_forecastid", "new_forecastquantity", "new_forecastquantityincartons", "new_forecaststatus", "new_channel", "new_month", "new_year", "_new_country_value", "_new_sku_value"]
+    },
+    "budgets": {
+      "tableName": "new_budgettables",
+      "primaryKey": "new_budgettableid",
+      "columns": {
+        "id": "new_budgettableid",
+        "name": "new_budgetid",
+        "budgetedQty": "new_budgetedquantity",
+        "budgetedQtyCartons": "new_budgetedquantityincartons",
+        "channel": "new_channel",
+        "month": "new_month",
+        "year": "new_year",
+        "monthYear": "new_monthyear",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {
+        "channel": {
+          "100000000": "Private",
+          "100000001": "Tender",
+          "100000002": "Offers"
+        }
+      },
+      "defaultSelect": ["new_budgettableid", "new_budgetid", "new_budgetedquantity", "new_budgetedquantityincartons", "new_channel", "new_month", "new_year"]
+    },
+    "shipments": {
+      "tableName": "new_shippingtables",
+      "primaryKey": "new_shippingtableid",
+      "columns": {
+        "id": "new_shippingtableid",
+        "name": "new_shipmentid",
+        "shipmentNumber": "new_shipmentnumber",
+        "deliveryDate": "new_deliverydate",
+        "month": "new_month",
+        "year": "new_year",
+        "status": "new_status",
+        "statecode": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "destination": "new_Destination@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "destination": "_new_destination_value"
+      },
+      "statusCodes": {
+        "status": {
+          "100000001": "In Transit",
+          "100000002": "Delivered"
+        }
+      },
+      "defaultSelect": ["new_shippingtableid", "new_shipmentid", "new_shipmentnumber", "new_deliverydate", "new_month", "new_year", "_new_country_value", "_new_destination_value"]
+    },
+    "allowedOrderMonths": {
+      "tableName": "new_allowedordermonthses",
+      "primaryKey": "new_allowedordermonthsid",
+      "columns": {
+        "id": "new_allowedordermonthsid",
+        "name": "new_name",
+        "month": "new_month",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {},
+      "defaultSelect": ["new_allowedordermonthsid", "new_name", "new_month", "_new_country_value", "_new_sku_value"]
+    },
+    "stockAgingReports": {
+      "tableName": "new_stockagingreporttables",
+      "primaryKey": "new_stockagingreporttableid",
+      "columns": {
+        "id": "new_stockagingreporttableid",
+        "name": "new_stockagingreportid",
+        "batchNo": "new_batchno",
+        "expiryDate": "new_expirydate",
+        "nearExpiryQty": "new_nearexpiryquantity",
+        "monthYear": "new_monthyear",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind",
+        "distributor": "new_Distributor@odata.bind",
+        "warehouse": "new_Warehouse@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value",
+        "distributor": "_new_distributor_value",
+        "warehouse": "_new_warehouse_value"
+      },
+      "statusCodes": {},
+      "defaultSelect": ["new_stockagingreporttableid", "new_stockagingreportid", "new_batchno", "new_expirydate", "new_nearexpiryquantity", "_new_country_value", "_new_sku_value"]
+    },
+    "forecastLogs": {
+      "tableName": "new_forecastlogs",
+      "primaryKey": "new_forecastlogid",
+      "columns": {
+        "id": "new_forecastlogid",
+        "name": "new_name",
+        "date": "new_date",
+        "qty": "new_qty",
+        "qtyInCartons": "new_qtyincartons",
+        "approvalStatus": "new_approvalstatus",
+        "month": "new_month",
+        "year": "new_year",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {
+        "approvalStatus": {
+          "100000000": "Submitted",
+          "100000001": "Approved by LO",
+          "100000002": "Approved By CFO"
+        }
+      },
+      "defaultSelect": ["new_forecastlogid", "new_name", "new_qty", "new_qtyincartons", "new_approvalstatus", "new_month", "new_year"]
+    },
+    "targetCoverStock": {
+      "tableName": "new_targetcoverstocks",
+      "primaryKey": "new_targetcoverstockid",
+      "columns": {
+        "id": "new_targetcoverstockid",
+        "name": "new_name",
+        "noOfMonths": "new_noofmonths",
+        "orderFrequency": "new_orderfrequency",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {},
+      "defaultSelect": ["new_targetcoverstockid", "new_name", "new_noofmonths", "new_orderfrequency", "_new_country_value", "_new_sku_value"]
+    },
+    "procurementSafeMargin": {
+      "tableName": "new_procurementsafemargins",
+      "primaryKey": "new_procurementsafemarginid",
+      "columns": {
+        "id": "new_procurementsafemarginid",
+        "name": "new_name",
+        "margin": "new_margin",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value"
+      },
+      "statusCodes": {},
+      "defaultSelect": ["new_procurementsafemarginid", "new_name", "new_margin", "_new_country_value"]
+    },
+    "skuCountryAssignments": {
+      "tableName": "new_skucountryassignments",
+      "primaryKey": "new_skucountryassignmentid",
+      "columns": {
+        "id": "new_skucountryassignmentid",
+        "name": "new_name",
+        "inForecast": "new_inforecast",
+        "status": "statecode",
+        "statusReason": "statuscode",
+        "createdOn": "createdon",
+        "modifiedOn": "modifiedon"
+      },
+      "lookups": {
+        "country": "new_Country@odata.bind",
+        "sku": "new_SKU@odata.bind"
+      },
+      "filterFields": {
+        "country": "_new_country_value",
+        "sku": "_new_sku_value"
+      },
+      "statusCodes": {},
+      "defaultSelect": ["new_skucountryassignmentid", "new_name", "new_inforecast", "_new_country_value", "_new_sku_value"]
+    }
+  }
+}
+

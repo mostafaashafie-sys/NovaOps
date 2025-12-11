@@ -6,6 +6,7 @@ import {
   useForecasts 
 } from '@/hooks/index.js';
 import { LabelService } from '@/services/index.js';
+import logger from '@/services/LoggerService.js';
 
 /**
  * Custom hook for OrderManagementPanel business logic
@@ -30,33 +31,52 @@ export const useOrderManagement = ({ orderItemId, countryId, skuId, monthKey, is
     pushToMonth: ''
   });
 
+  // Helper function to check if orderItemId is valid (GUID or OI- prefixed)
+  const isValidOrderItemId = (id) => {
+    if (!id) return false;
+    // Check if it's a GUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    const guidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Or check if it starts with 'OI-' (legacy format)
+    return guidPattern.test(id) || id.startsWith('OI-');
+  };
+
   // Load order item when ID changes
   useEffect(() => {
-    if (orderItemId && isOpen) {
+    // Only load order item if we have a valid orderItemId
+    // Skip loading when orderItemId is null (e.g., when creating a new order)
+    if (isOpen && orderItemId && isValidOrderItemId(orderItemId)) {
       loadOrderItem();
-    } else if (isOpen && countryId && skuId && monthKey) {
-      loadContextOrderItems();
+    } else if (isOpen && !orderItemId && countryId && skuId && monthKey) {
+      // When creating a new order (orderItemId is null), clear the order item
+      setOrderItem(null);
+      setPO(null);
     }
-  }, [orderItemId, isOpen, countryId, skuId, monthKey]);
+  }, [orderItemId, isOpen]); // Removed unnecessary dependencies to prevent duplicate loads
 
   const loadOrderItem = async () => {
+    // Skip if orderItemId is invalid
+    if (!orderItemId || !isValidOrderItemId(orderItemId)) {
+      setOrderItem(null);
+      return;
+    }
+    
     try {
       setLoading(true);
-      console.log('[useOrderManagement] 🔍 Loading order item', { orderItemId });
+      logger.debug('Loading order item', { orderItemId });
       const item = await getOrderItemById(orderItemId);
-      console.log('[useOrderManagement] 📦 Order item loaded', { item: item ? { id: item.id, status: item.status } : null });
       if (!item) {
-        console.warn('[useOrderManagement] ⚠️ Order item not found', { orderItemId });
+        logger.warn('Order item not found', { orderItemId });
         setOrderItem(null);
         return;
       }
+      logger.debug('Order item loaded', { itemId: item.id, status: item.status });
       setOrderItem(item);
       if (item?.poId) {
         const poData = await getPOById(item.poId);
         setPO(poData);
       }
     } catch (err) {
-      console.error('[useOrderManagement] ❌ Error loading order item:', err);
+      logger.error('Error loading order item', err);
       setOrderItem(null);
     } finally {
       setLoading(false);
@@ -84,7 +104,9 @@ export const useOrderManagement = ({ orderItemId, countryId, skuId, monthKey, is
   useEffect(() => {
     const loadLabels = async () => {
       try {
-        const labelsData = await LabelService.getLabels({ isActive: true });
+        // Use status instead of isActive (0 = Active, 1 = Inactive in Dataverse)
+        // status maps to statecode in the schema
+        const labelsData = await LabelService.getLabels({ status: 0 });
         setLabels(labelsData);
       } catch (err) {
         console.error('Error loading labels:', err);
@@ -198,9 +220,29 @@ export const useOrderManagement = ({ orderItemId, countryId, skuId, monthKey, is
   };
 
   const handleConfirmToPO = async (labelId, poId = null, poDetails = null) => {
+    // First, ensure we have a valid order item loaded
     if (!orderItem) {
-      throw new Error('No order item selected');
+      // Try to reload if we have an orderItemId
+      if (orderItemId && isValidOrderItemId(orderItemId)) {
+        await loadOrderItem();
+        // Check again after reload
+        if (!orderItem) {
+          throw new Error('Order item not found. Please refresh and try again.');
+        }
+      } else {
+        throw new Error('No order item selected');
+      }
     }
+    
+    if (!orderItem.id) {
+      throw new Error('Order item ID is missing. Please wait for the order item to be fully created.');
+    }
+    
+    // Ensure orderItem.id is valid
+    if (!isValidOrderItemId(orderItem.id)) {
+      throw new Error('Invalid order item ID. Please refresh and try again.');
+    }
+    
     // Allow both Forecasted and Planned items to be confirmed (if Forecasted, we'll plan first)
     if (orderItem.status !== 'Planned' && orderItem.status !== 'Forecasted') {
       throw new Error('Only planned or forecasted order items can be confirmed to PO');
@@ -212,19 +254,43 @@ export const useOrderManagement = ({ orderItemId, countryId, skuId, monthKey, is
     try {
       let finalPOId = poId || orderItem.poId;
       
-      // If creating new PO (poId is explicitly null), create PO first with details
+      // If creating new PO (poId is explicitly null), create PO first (empty), then link order item
       if (poId === null && !orderItem.poId) {
         if (!poDetails || !poDetails.poName || !poDetails.poDate || !poDetails.deliveryDate) {
           throw new Error('PO name, PO date, and delivery date are required when creating a new PO');
         }
+        
+        // Double-check orderItem.id is still valid (it should be after the checks above)
+        const validOrderItemId = orderItem.id;
+        if (!validOrderItemId || !isValidOrderItemId(validOrderItemId)) {
+          throw new Error('Invalid order item ID. Please refresh and try again.');
+        }
+        
+        logger.action('Creating new PO (empty, will link order item after)', { 
+          poName: poDetails.poName
+        });
+        
+        // Step 1: Create PO without order items (empty array)
         const newPO = await createPO(
-          [orderItem.id], 
+          [], // Empty array - create PO first
           'Ahmed Hassan', 
           poDetails.poName, 
           poDetails.poDate, 
           poDetails.deliveryDate
         );
         finalPOId = newPO.id;
+        
+        logger.action('PO created, now linking order item', { 
+          poId: finalPOId,
+          orderItemId: validOrderItemId
+        });
+        
+        // Step 2: Link order item to the newly created PO
+        await linkOrderItemsToPO(finalPOId, [validOrderItemId]);
+        
+        // Step 3: Refresh order item to get updated poId
+        await refreshOrderItems();
+        await loadOrderItem();
       } else if (poId && poId !== orderItem.poId) {
         // If PO ID provided and different, validate country match before linking
         const targetPO = await getPOById(poId);

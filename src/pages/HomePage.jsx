@@ -1,154 +1,219 @@
-import { useApp } from '@/providers/index.js';
-import { useShipments, useStockCover, useOrderItems, usePOs } from '@/hooks/index.js';
-import { Card, StatusBadge, PageHeader, LoadingState } from '@/components/index.js';
-import { formatNumber } from '@/utils/index.js';
+import { useState, useEffect } from 'react';
+import { useMsal } from '@azure/msal-react';
+import { LoadingState } from '@/components/index.js';
 
 /**
  * Home Page Component
- * Dashboard with key metrics and recent activity
+ * Simple dashboard with user greeting, role, and a joke
  */
 export const HomePage = ({ onNavigate }) => {
-  const { data, loading: appLoading } = useApp();
-  const { shipments, loading: shipmentsLoading } = useShipments();
-  const { stockCoverData, loading: stockCoverLoading } = useStockCover();
-  const { orderItems, loading: orderItemsLoading } = useOrderItems();
-  const { pos, loading: posLoading } = usePOs();
-  
-  const isLoading = appLoading || shipmentsLoading || stockCoverLoading || orderItemsLoading || posLoading;
-  
-  if (!data || isLoading) {
-    return <LoadingState message="Loading dashboard..." />;
+  const { accounts, instance } = useMsal();
+  const [joke, setJoke] = useState(null);
+  const [jokeLoading, setJokeLoading] = useState(true);
+  const [userRole, setUserRole] = useState(null);
+  const [userPhoto, setUserPhoto] = useState(null);
+
+  // Get user info from MSAL account
+  const account = accounts.length > 0 ? accounts[0] : null;
+  const userName = account?.name || account?.username || 'User';
+
+  // Extract user role and photo from ID token claims or try to fetch from Microsoft Graph
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!account) return;
+
+      let roleFound = false;
+
+      // First, try to get roles from ID token claims
+      if (account.idTokenClaims) {
+        const claims = account.idTokenClaims;
+        
+        // Check for roles in token claims
+        if (claims.roles && Array.isArray(claims.roles) && claims.roles.length > 0) {
+          setUserRole(claims.roles.join(', '));
+          roleFound = true;
+        } else if (claims.role) {
+          setUserRole(claims.role);
+          roleFound = true;
+        } else if (claims['extension_Role']) {
+          setUserRole(claims['extension_Role']);
+          roleFound = true;
+        }
+      }
+
+      // Try to fetch from Microsoft Graph API if we have the right scopes
+      try {
+        const scopes = ['User.Read'];
+        const tokenResponse = await instance.acquireTokenSilent({
+          scopes: scopes,
+          account: account
+        }).catch(() => null);
+
+        if (tokenResponse?.accessToken) {
+          // Fetch user info which might include job title or department
+          const graphResponse = await fetch('https://graph.microsoft.com/v1.0/me', {
+            headers: {
+              'Authorization': `Bearer ${tokenResponse.accessToken}`
+            }
+          });
+
+          if (graphResponse.ok) {
+            const userData = await graphResponse.json();
+            // Use jobTitle or department as role if available and not already set
+            if (!roleFound) {
+              if (userData.jobTitle) {
+                setUserRole(userData.jobTitle);
+                roleFound = true;
+              } else if (userData.department) {
+                setUserRole(userData.department);
+                roleFound = true;
+              }
+            }
+
+            // Fetch user photo
+            try {
+              const photoResponse = await fetch('https://graph.microsoft.com/v1.0/me/photo/$value', {
+                headers: {
+                  'Authorization': `Bearer ${tokenResponse.accessToken}`
+                }
+              });
+
+              if (photoResponse.ok) {
+                const photoBlob = await photoResponse.blob();
+                const photoUrl = URL.createObjectURL(photoBlob);
+                setUserPhoto(photoUrl);
+              }
+            } catch (photoError) {
+              // Silently fail - photo is optional
+              console.debug('Could not fetch user photo:', photoError);
+            }
+          }
+        }
+      } catch (error) {
+        // Silently fail - we'll just not show a role or photo
+        console.debug('Could not fetch user data from Graph API:', error);
+      }
+    };
+
+    fetchUserData();
+  }, [account, instance]);
+
+  // Cleanup: revoke photo URL when component unmounts or photo changes
+  useEffect(() => {
+    return () => {
+      if (userPhoto) {
+        URL.revokeObjectURL(userPhoto);
+      }
+    };
+  }, [userPhoto]);
+
+  // Fetch a joke from JokeAPI (excluding technical categories)
+  const fetchJoke = async () => {
+    setJokeLoading(true);
+    try {
+      // Exclude Programming, Misc, and other technical categories
+      // Use categories: Pun, Spooky, Christmas, Any (but filter out technical)
+      const categories = ['Pun', 'Spooky', 'Christmas'];
+      const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+      
+      const response = await fetch(`https://v2.jokeapi.dev/joke/${randomCategory}?type=single&safe-mode`);
+      const data = await response.json();
+      
+      if (data.joke) {
+        setJoke(data.joke);
+      } else if (data.setup && data.delivery) {
+        // Handle two-part jokes
+        setJoke(`${data.setup} ${data.delivery}`);
+      } else {
+        // Fallback to a simple category if the random one didn't work
+        const fallbackResponse = await fetch('https://v2.jokeapi.dev/joke/Pun?type=single&safe-mode');
+        const fallbackData = await fallbackResponse.json();
+        if (fallbackData.joke) {
+          setJoke(fallbackData.joke);
+        } else if (fallbackData.setup && fallbackData.delivery) {
+          setJoke(`${fallbackData.setup} ${fallbackData.delivery}`);
+        } else {
+          setJoke(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching joke:', error);
+      setJoke(null);
+    } finally {
+      setJokeLoading(false);
+    }
+  };
+
+  // Fetch joke on component mount
+  useEffect(() => {
+    fetchJoke();
+  }, []);
+
+  if (!account) {
+    return <LoadingState message="Loading..." />;
   }
-  
-  // Calculate order item statistics
-  const pendingPlannedItems = orderItems.filter(oi => oi.status === 'Planned').length;
-  const backOrderItems = orderItems.filter(oi => oi.status === 'Back Order').length;
-  const lowStockAlerts = Object.values(stockCoverData || {}).reduce((count, country) => {
-    return count + Object.values(country).filter(sku => {
-      const latestMonth = Object.values(sku.months || {})[2];
-      return latestMonth && latestMonth.monthsCover < 2;
-    }).length;
-  }, 0);
-  const shipmentsInTransit = shipments.filter(s => s.status === 'In Transit').length;
-  
-  // Approval counts
-  const pendingRegulatoryApprovals = orderItems.filter(oi => oi.status === 'Pending Regulatory').length;
-  const pendingPOApprovals = pos.filter(po => po.status === 'Pending CFO Approval').length;
 
   return (
-    <div className="space-y-6">
-      <PageHeader 
-        title="Dashboard" 
-        description="Welcome to NovaOps! Here's your supply chain overview."
-      />
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card 
-          title="Low Stock Alerts" 
-          value={lowStockAlerts}
-          subtitle="SKUs below 2 months cover"
-          color="red"
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
-        />
-        {pendingPlannedItems > 0 && (
-          <Card 
-            title="Planned Items" 
-            value={pendingPlannedItems}
-            subtitle="Order items ready to confirm"
-            color="amber"
-            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>}
-            onClick={onNavigate ? () => onNavigate('stockcover') : undefined}
-            clickable={true}
-          />
-        )}
-        {pendingRegulatoryApprovals > 0 && (
-          <Card 
-            title="Regulatory Approval" 
-            value={pendingRegulatoryApprovals}
-            subtitle="Labels pending approval"
-            color="orange"
-            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-            onClick={onNavigate ? () => onNavigate('regulatory-approval') : undefined}
-            clickable={true}
-          />
-        )}
-        {pendingPOApprovals > 0 && (
-          <Card 
-            title="PO Approval (CFO)" 
-            value={pendingPOApprovals}
-            subtitle="Purchase orders pending"
-            color="purple"
-            icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>}
-            onClick={onNavigate ? () => onNavigate('po-approval') : undefined}
-            clickable={true}
-          />
-        )}
-        <Card 
-          title="Back Order Items" 
-          value={backOrderItems}
-          subtitle="Ready for allocation"
-          color="green"
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-          onClick={backOrderItems > 0 && onNavigate ? () => onNavigate('stockcover') : undefined}
-          clickable={backOrderItems > 0}
-        />
-        <Card 
-          title="In Transit" 
-          value={shipmentsInTransit}
-          subtitle="Shipments on the way"
-          color="blue"
-          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>}
-        />
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Order Items */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Recent Order Items</h2>
-          <div className="space-y-3">
-            {orderItems.slice(0, 5).map(orderItem => (
-              <div key={orderItem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                <div>
-                  <p className="font-medium text-gray-900 font-mono text-sm">{orderItem.id}</p>
-                  <p className="text-sm text-gray-500">{orderItem.skuName} • {orderItem.countryName}</p>
+    <div className="min-h-[calc(100vh-8rem)] flex items-center justify-center p-6">
+      <div className="max-w-4xl w-full">
+        <div className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 rounded-2xl shadow-xl border border-gray-100 p-12 md:p-16">
+          <div className="text-center space-y-8">
+            {/* Greeting Section */}
+            <div className="space-y-4">
+              <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 mb-4 shadow-lg overflow-hidden ring-4 ring-white">
+                {userPhoto ? (
+                  <img 
+                    src={userPhoto} 
+                    alt={userName}
+                    className="w-full h-full object-cover"
+                    onError={() => setUserPhoto(null)} // Fallback to icon if image fails to load
+                  />
+                ) : (
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                )}
+              </div>
+              <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Hello {userName}!
+              </h1>
+              {userRole && (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-full border border-gray-200 shadow-sm">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M5.5 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+                  </svg>
+                  <span className="text-sm font-medium text-gray-700">{userRole}</span>
                 </div>
-                <div className="text-right">
-                  <StatusBadge status={orderItem.status} />
-                  <p className="text-sm text-gray-400 mt-1">{formatNumber(orderItem.qtyCartons)} cartons</p>
+              )}
+            </div>
+
+            {/* Joke Section */}
+            {jokeLoading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                <span className="text-gray-500 text-sm">Loading a joke for you...</span>
+              </div>
+            ) : joke ? (
+              <div className="mt-12 pt-8 border-t border-gray-200">
+                <div className="bg-white/90 backdrop-blur-sm rounded-xl p-8 shadow-md border border-gray-100">
+                  <div className="flex items-start gap-4">
+                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-md">
+                      <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-800 text-lg md:text-xl leading-relaxed flex-1 text-left">
+                      {joke}
+                    </p>
+                  </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-        
-        {/* Stock Alerts */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Stock Alerts</h2>
-          <div className="space-y-3">
-            {Object.entries(stockCoverData || {}).slice(0, 1).flatMap(([countryId, skus]) =>
-              Object.entries(skus).filter(([_, skuData]) => {
-                const latestMonth = Object.values(skuData.months)[2];
-                return latestMonth && latestMonth.monthsCover < 3;
-              }).slice(0, 5).map(([skuId, skuData]) => {
-                const latestMonth = Object.values(skuData.months)[2];
-                return (
-                  <div key={`${countryId}-${skuId}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <p className="font-medium text-gray-900">{skuData.sku.name}</p>
-                      <p className="text-sm text-gray-500">{data.countries.find(c => c.id === countryId)?.name}</p>
-                    </div>
-                    <div 
-                      className="px-3 py-1 rounded-full text-sm font-semibold"
-                      style={{ 
-                        backgroundColor: latestMonth.monthsCover < 2 ? '#ef4444' : '#f59e0b',
-                        color: 'white'
-                      }}
-                    >
-                      {latestMonth.monthsCover.toFixed(1)} months
-                    </div>
-                  </div>
-                );
-              })
+            ) : (
+              <div className="mt-12 pt-8 border-t border-gray-200">
+                <div className="bg-gray-50 rounded-xl p-8 border border-gray-200">
+                  <p className="text-gray-500">No joke available at the moment.</p>
+                </div>
+              </div>
             )}
           </div>
         </div>

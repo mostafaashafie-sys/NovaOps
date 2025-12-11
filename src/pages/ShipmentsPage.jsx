@@ -29,7 +29,7 @@ export const ShipmentsPage = () => {
       await ShipmentService.createShipment(shipmentData);
       await refresh();
     } catch (err) {
-      alert('Error creating shipment: ' + err.message);
+      showMessage.error('Error creating shipment: ' + err.message);
       throw err;
     }
   };
@@ -39,7 +39,7 @@ export const ShipmentsPage = () => {
       await ShipmentService.addOrderItemsToShipment(shipmentId, orderItemIds);
       await refresh();
     } catch (err) {
-      alert('Error adding items to shipment: ' + err.message);
+      showMessage.error('Error adding items to shipment: ' + err.message);
       throw err;
     }
   };

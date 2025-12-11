@@ -205,10 +205,10 @@ All components are built with Tailwind CSS and follow a consistent design system
 
 For detailed information, see:
 
-- **ARCHITECTURE.md** - Complete architecture documentation, folder structure, and layer responsibilities
+- **ARCHITECTURE.md** - Complete architecture documentation, folder structure, layer responsibilities, and data model relationships
 - **BUSINESS_LOGIC.md** - Business logic workflow, data models, and user roles
-- **COMPONENT_ORGANIZATION.md** - Component organization guide and import patterns
-- **FEATURE_LOCATION_GUIDE.md** - Guide to finding features and components in the codebase
+- **Order_Lifecycle_Documentation_v2.md** - Complete order and PO lifecycle documentation with status flows
+- **COMPONENT_ORGANIZATION.md** - Component organization guide, import patterns, and feature location guide
 - **REUSABLE_COMPONENTS_GUIDE.md** - Guide to reusable UI components and their usage
 
 ## 📄 License

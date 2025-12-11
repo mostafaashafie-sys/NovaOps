@@ -25,12 +25,12 @@ export const AllocationModal = ({
     
     // Validate order item status before submission
     if (!orderItem) {
-      alert('Order item not found');
+      showMessage.error('Order item not found');
       return;
     }
     
     if (orderItem.status !== 'Back Order') {
-      alert(`Cannot allocate: Order item status is "${orderItem.status}". Only items with status "Back Order" can be allocated.`);
+      showMessage.warning(`Cannot allocate: Order item status is "${orderItem.status}". Only items with status "Back Order" can be allocated.`);
       return;
     }
     
@@ -38,7 +38,7 @@ export const AllocationModal = ({
       await onAllocate();
       handleClose();
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 

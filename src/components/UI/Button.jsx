@@ -1,7 +1,9 @@
+import { Button as AntButton } from 'antd';
 
 /**
  * Button Component
- * Reusable button with variants and sizes
+ * Reusable button with variants and sizes using Ant Design
+ * Maintains same API as custom Button for backward compatibility
  */
 export const Button = ({
   children,
@@ -16,49 +18,54 @@ export const Button = ({
   className = '',
   ...props
 }) => {
-  const baseClasses = 'font-medium transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
-  
-  const variants = {
-    primary: 'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-md hover:shadow-lg',
-    secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
-    success: 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 shadow-md hover:shadow-lg',
-    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 shadow-md hover:shadow-lg',
-    warning: 'bg-amber-600 text-white hover:bg-amber-700 focus:ring-amber-500 shadow-md hover:shadow-lg',
-    outline: 'border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500',
-    ghost: 'text-gray-700 hover:bg-gray-100 focus:ring-gray-500',
-    gradient: 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white focus:ring-blue-500 shadow-md hover:shadow-lg'
+  // Map custom variants to Ant Design types
+  const typeMap = {
+    primary: 'primary',
+    secondary: 'default',
+    success: 'primary', // Ant Design doesn't have success, use primary with custom class
+    danger: 'primary', // Ant Design doesn't have danger, use primary with custom class
+    warning: 'primary', // Ant Design doesn't have warning, use primary with custom class
+    outline: 'default',
+    ghost: 'text',
+    gradient: 'primary'
   };
   
-  const sizes = {
-    xs: 'px-2 py-1 text-xs',
-    sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2 text-sm',
-    lg: 'px-6 py-3 text-base',
-    xl: 'px-8 py-4 text-lg'
+  // Map custom sizes to Ant Design sizes
+  const sizeMap = {
+    xs: 'small',
+    sm: 'small',
+    md: 'middle',
+    lg: 'large',
+    xl: 'large'
   };
   
-  const widthClass = fullWidth ? 'w-full' : '';
-  const roundedClass = 'rounded-lg';
+  // Custom classes for variants Ant Design doesn't support
+  const variantClasses = {
+    success: 'ant-btn-success',
+    danger: 'ant-btn-danger',
+    warning: 'ant-btn-warning',
+    gradient: 'ant-btn-gradient'
+  };
+  
+  const antType = typeMap[variant] || 'default';
+  const antSize = sizeMap[size] || 'middle';
+  const variantClass = variantClasses[variant] || '';
   
   return (
-    <button
-      type={type}
+    <AntButton
+      type={antType}
+      size={antSize}
       onClick={onClick}
-      disabled={disabled || loading}
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${roundedClass} ${widthClass} ${className}`}
+      disabled={disabled}
+      loading={loading}
+      block={fullWidth}
+      icon={icon}
+      htmlType={type}
+      className={`${variantClass} ${className}`}
       {...props}
     >
-      <span className="flex items-center justify-center gap-2">
-        {loading && (
-          <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        )}
-        {icon && !loading && <span>{icon}</span>}
-        {children}
-      </span>
-    </button>
+      {children}
+    </AntButton>
   );
 };
 

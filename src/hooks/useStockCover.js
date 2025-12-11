@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { StockCoverService } from '@/services/index.js';
+import { useApp } from '@/providers/index.js';
 
 /**
  * Custom Hook for Stock Cover Management
@@ -7,16 +8,38 @@ import { StockCoverService } from '@/services/index.js';
  */
 export const useStockCover = (countryId = null) => {
   const queryClient = useQueryClient();
+  const { data: appData } = useApp(); // Get cached SKUs from AppProvider
 
   const { data: stockCoverData = {}, isLoading: loading, error } = useQuery({
     queryKey: ['stockCover', countryId],
     queryFn: async () => {
-      if (countryId) {
-        return await StockCoverService.getStockCoverData(countryId);
-      } else {
-        return await StockCoverService.getAllStockCoverData();
+      // Use cached SKUs from appData to avoid duplicate fetches
+      const cachedSkus = appData?.skus || null;
+      
+      // Only fetch for a specific country - never fetch all countries
+      if (!countryId) {
+        return {};
       }
+      
+      console.log('Fetching stock cover data from Dataverse for country:', countryId);
+      const data = await StockCoverService.getStockCoverData(countryId, 0, true, cachedSkus);
+      console.log('Stock cover data fetched:', {
+        countryId,
+        skuCount: Object.keys(data || {}).length,
+        sampleMonths: Object.values(data || {})[0]?.months ? Object.keys(Object.values(data)[0].months).slice(0, 5) : []
+      });
+      return data;
     },
+    // Only fetch when a country is selected
+    enabled: !!countryId && !!countryId.trim(),
+    // Cache data for 5 minutes to prevent duplicate fetches
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    // Only refetch on mount if data is stale
+    refetchOnMount: 'always',
+    // Don't refetch on window focus to reduce API calls
+    refetchOnWindowFocus: false,
+    // Don't refetch on reconnect to prevent duplicate fetches
+    refetchOnReconnect: false,
   });
 
   const updatePlannedQtyMutation = useMutation({

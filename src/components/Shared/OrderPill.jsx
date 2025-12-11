@@ -12,6 +12,15 @@ export const OrderPill = ({ orderItem, onClick, showPO = true, onDragStart: onDr
     const colors = {
       'Forecasted': { bg: 'bg-gray-100', text: 'text-gray-700', border: 'border-gray-300' },
       'Planned': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
+      'Pending Regulatory': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
+      'Regulatory Approved': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
+      'Order Approved': { bg: 'bg-emerald-100', text: 'text-emerald-800', border: 'border-emerald-300' },
+      'Back Order': { bg: 'bg-indigo-100', text: 'text-indigo-700', border: 'border-indigo-300' },
+      'Allocated to Market': { bg: 'bg-cyan-100', text: 'text-cyan-700', border: 'border-cyan-300' },
+      'Shipped to Market': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+      'Arrived to Market': { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300' },
+      'Deleted': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300' },
+      // Legacy statuses for backward compatibility
       'Confirmed to UP': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-300' },
       'Partially Allocated': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-300' },
       'Fully Allocated': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
@@ -117,9 +126,9 @@ export const OrderPill = ({ orderItem, onClick, showPO = true, onDragStart: onDr
         {orderItem.qtyCartons} cartons
       </span>
       <div className="flex items-center gap-2">
-        {showPO && orderItem.poId && (
+        {showPO && (orderItem.poName || orderItem.poId) && (
           <span className="px-2 py-0.5 rounded bg-white/80 text-gray-800 font-semibold border border-gray-300 text-[10px]">
-            PO: {orderItem.poId}
+            PO: {orderItem.poName || orderItem.poId}
           </span>
         )}
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${statusColors.bg} ${statusColors.text} border ${statusColors.border}`}>

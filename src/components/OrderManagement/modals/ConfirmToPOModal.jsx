@@ -45,24 +45,24 @@ export const ConfirmToPOModal = ({
 
   const handleConfirm = async () => {
     if (!selectedLabelId) {
-      alert('Please select a label');
+      showMessage.warning('Please select a label');
       return;
     }
     if (!createNewPO && !selectedPOId && !orderItem?.poId) {
-      alert('Please select a PO or choose to create a new one');
+      showMessage.warning('Please select a PO or choose to create a new one');
       return;
     }
     if (createNewPO) {
       if (!poName || !poName.trim()) {
-        alert('Please enter a PO name');
+        showMessage.warning('Please enter a PO name');
         return;
       }
       if (!poDate) {
-        alert('Please select a PO date');
+        showMessage.warning('Please select a PO date');
         return;
       }
       if (!deliveryDate) {
-        alert('Please select a delivery date');
+        showMessage.warning('Please select a delivery date');
         return;
       }
     }
@@ -81,7 +81,7 @@ export const ConfirmToPOModal = ({
       setPoDate('');
       setDeliveryDate('');
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 

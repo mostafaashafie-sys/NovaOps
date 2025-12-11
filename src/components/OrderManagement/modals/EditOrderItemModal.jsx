@@ -42,7 +42,7 @@ export const EditOrderItemModal = ({
       });
       onClose();
     } catch (err) {
-      alert(err.message || 'Failed to update order item');
+      showMessage.error(err.message || 'Failed to update order item');
     } finally {
       setIsSubmitting(false);
     }

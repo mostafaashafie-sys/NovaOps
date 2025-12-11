@@ -19,7 +19,7 @@ export const RegulatoryRejectModal = ({
       setReason('');
       onClose();
     } catch (err) {
-      alert(err.message);
+      showMessage.error(err.message);
     }
   };
 
