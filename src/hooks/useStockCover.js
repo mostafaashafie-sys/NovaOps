@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { StockCoverService } from '@/services/index.js';
+import { StockManagementService, StockCalculationService } from '@/services/index.js';
 import { useApp } from '@/providers/index.js';
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('useStockCover');
 
 /**
  * Custom Hook for Stock Cover Management
@@ -21,21 +24,22 @@ export const useStockCover = (countryId = null) => {
         return {};
       }
       
-      console.log('Fetching stock cover data from Dataverse for country:', countryId);
-      const data = await StockCoverService.getStockCoverData(countryId, 0, true, cachedSkus);
-      console.log('Stock cover data fetched:', {
+      logger.debug('Fetching stock cover data via CalculationOrchestrator', { countryId });
+      const data = await StockManagementService.getStockCoverData(countryId, 0, true, cachedSkus);
+      logger.debug('Stock cover data fetched and calculated via CalculationOrchestrator', {
         countryId,
         skuCount: Object.keys(data || {}).length,
-        sampleMonths: Object.values(data || {})[0]?.months ? Object.keys(Object.values(data)[0].months).slice(0, 5) : []
+        hasData: !!(data && Object.keys(data).length > 0),
+        sampleSkuIds: Object.keys(data || {}).slice(0, 5)
       });
-      return data;
+      return data || {};
     },
     // Only fetch when a country is selected
     enabled: !!countryId && !!countryId.trim(),
     // Cache data for 5 minutes to prevent duplicate fetches
     staleTime: 1000 * 60 * 5, // 5 minutes
-    // Only refetch on mount if data is stale
-    refetchOnMount: 'always',
+    // Don't refetch on mount - use cached data if available (prevents infinite loops)
+    refetchOnMount: false,
     // Don't refetch on window focus to reduce API calls
     refetchOnWindowFocus: false,
     // Don't refetch on reconnect to prevent duplicate fetches
@@ -44,16 +48,27 @@ export const useStockCover = (countryId = null) => {
 
   const updatePlannedQtyMutation = useMutation({
     mutationFn: ({ countryIdParam, skuId, monthKey, newValue }) =>
-      StockCoverService.updatePlannedQty(countryIdParam, skuId, monthKey, newValue),
+      StockManagementService.updatePlannedQty(countryIdParam, skuId, monthKey, newValue),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stockCover'] });
     },
   });
 
-  const calculateMonthsCover = async (countryId, skuId) => {
+  const calculateMonthsCover = async (countryId, skuId, year = null, month = null) => {
     try {
-      return await StockCoverService.calculateMonthsCover(countryId, skuId);
+      logger.debug('Calculating monthsCover via CalculationOrchestrator', { countryId, skuId, year, month });
+      // Use CalculationOrchestrator for monthsCover calculation
+      const context = { countryId, skuId };
+      if (year && month) {
+        context.year = year;
+        context.month = month;
+        context.monthKey = `${year}-${String(month).padStart(2, '0')}`;
+      }
+      const result = await StockCalculationService.executeMeasure('monthsCover', {}, context);
+      logger.debug('MonthsCover calculated successfully', { countryId, skuId, result });
+      return result;
     } catch (err) {
+      logger.error('Error calculating monthsCover via CalculationOrchestrator', { countryId, skuId, error: err.message });
       throw err;
     }
   };

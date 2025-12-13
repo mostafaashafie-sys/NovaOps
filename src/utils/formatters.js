@@ -3,9 +3,12 @@
  * Centralized formatting functions for numbers, dates, and other data types
  */
 
-export const formatNumber = (num) => {
+export const formatNumber = (num, decimals = 0) => {
   if (num === null || num === undefined) return '—';
-  return Math.round(num).toLocaleString();
+  if (decimals === 0) {
+    return Math.round(num).toLocaleString();
+  }
+  return Number(num).toFixed(decimals).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 export const formatCover = (num) => {
@@ -31,6 +34,19 @@ export const formatDateTime = (dateStr) => {
     hour: '2-digit', 
     minute: '2-digit'
   });
+};
+
+/**
+ * Format field name from snake_case to Title Case
+ * @param {string} fieldName - Field name in snake_case or other format
+ * @returns {string} Formatted field name in Title Case
+ */
+export const formatFieldName = (fieldName) => {
+  if (!fieldName) return '?';
+  // Convert snake_case to Title Case
+  return fieldName
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, l => l.toUpperCase());
 };
 
 import { UI } from '@/config/app.constants.js';

@@ -155,6 +155,20 @@ export const StockCoverRow = ({
                     : 0;
                   return formatCover(avgCover);
                 })()
+              ) : measure.type === 'percentage' ? (
+                (() => {
+                  // Calculate average percentage for this year
+                  if (!skuData || !skuData.months) {
+                    return <div className="text-xs text-amber-700">—</div>;
+                  }
+                  const percentages = yearMonths
+                    .map(m => skuData.months[m.key]?.[measure.key])
+                    .filter(v => typeof v === 'number');
+                  const avgPercentage = percentages.length > 0 
+                    ? percentages.reduce((s, v) => s + v, 0) / percentages.length 
+                    : 0;
+                  return formatNumber(avgPercentage, 1) + '%';
+                })()
               ) : (
                 (() => {
                   // Sum for this year (in cartons - default unit in data)

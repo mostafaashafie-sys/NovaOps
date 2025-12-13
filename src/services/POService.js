@@ -1,6 +1,5 @@
 import DataverseDataService from './DataverseDataService.js';
 import OrderItemService from './OrderItemService.js';
-import { DataverseConfig } from '@/config/index.js';
 
 /**
  * Purchase Order (PO) Service

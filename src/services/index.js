@@ -11,5 +11,10 @@ export { default as LoggerService } from './LoggerService.js';
 export { default as OrderItemService } from './OrderItemService.js';
 export { default as POService } from './POService.js';
 export { default as ShipmentService } from './ShipmentService.js';
-export { default as StockCoverService } from './StockCoverService.js';
+export { default as StockCalculationService } from './StockCalculationService.js';
+export { calculationEngine } from './CalculationEngine.js';
+export { calculationOrchestrator } from './CalculationOrchestrator.js';
+export { default as StockManagementService } from './StockManagementService.js';
+export { default as SchemaDiscoveryService } from './SchemaDiscoveryService.js';
+export { default as SchemaSyncService } from './SchemaSyncService.js';
 

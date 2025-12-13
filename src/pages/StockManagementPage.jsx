@@ -11,6 +11,9 @@ import {
 import ReactCountryFlag from 'react-country-flag';
 import { LoadingState } from '@/components/index.js';
 import { DataverseDataService } from '@/services/index.js';
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('StockManagementPage');
 
 /**
  * Stock Management Page
@@ -196,8 +199,7 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
         const oldestDate = new Date(Math.min(...dates));
         const oldestDateString = oldestDate.toISOString().split('T')[0];
         
-        // Debug log to verify we're getting the correct oldest date
-        console.log('Oldest inventory date found:', {
+        logger.debug('Oldest inventory date found', {
           oldestDate: oldestDateString,
           totalRecords: inventory.length,
           recordsWithOpeningStock: inventoryWithOpeningStock.length,
@@ -206,7 +208,7 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
         
         return oldestDateString; // Return as YYYY-MM-DD
       } catch (error) {
-        console.error('Error fetching oldest inventory date:', error);
+        logger.error('Error fetching oldest inventory date', { error: error.message });
         return null;
       }
     },
@@ -221,16 +223,13 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
   const months = useMemo(() => {
     const generatedMonths = generateMonthsForCountry(oldestInventoryDate);
     
-    // Debug log to verify month generation
-    if (oldestInventoryDate && generatedMonths.length > 0) {
-      console.log('Month generation for country:', {
-        selectedCountry,
-        oldestInventoryDate,
-        startMonth: generatedMonths[0]?.key,
-        endMonth: generatedMonths[generatedMonths.length - 1]?.key,
-        totalMonths: generatedMonths.length
-      });
-    }
+    logger.debug('Month generation for country', {
+      selectedCountry,
+      oldestInventoryDate,
+      startMonth: generatedMonths[0]?.key,
+      endMonth: generatedMonths[generatedMonths.length - 1]?.key,
+      totalMonths: generatedMonths.length
+    });
     
     return generatedMonths;
   }, [oldestInventoryDate, selectedCountry]);
@@ -253,39 +252,78 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
     return Object.keys(monthsByYear).sort((a, b) => parseInt(a) - parseInt(b));
   }, [monthsByYear]);
 
-  // Show loading state while app data is loading
-  if (!data) {
-    return <LoadingState message="Loading application data..." />;
-  }
-
-  // Show country selection screen if no country is selected
-  const showCountrySelection = !selectedCountry;
-
   // When countryId is selected, useStockCover returns data directly (object of SKUs: { skuId: { sku: {...}, months: {...} } })
   // When no countryId, it returns { countryId: { skuId: {...} } }
   // Since we always pass selectedCountry to useStockCover, stockCoverData is already the country data
   // Group SKUs by category (Range: Standard, Genio, Special) and sort by sortOrder within each group
   // Only show SKUs that are assigned to the selected country
+  // MUST be before early return to comply with Rules of Hooks
   const countryDataByRange = useMemo(() => {
-    if (!stockCoverData) return {};
+    if (!stockCoverData) {
+      logger.debug('No stock cover data available (calculated via CalculationEngine)', { 
+        selectedCountry, 
+        stockCoverLoading 
+      });
+      return {};
+    }
     
     // Use filtered SKUs when country is selected, otherwise use all SKUs
+    // Always filter by assignments - no fallback
     const skusToUse = selectedCountry ? filteredSkus : (data?.skus || []);
-    if (!skusToUse || skusToUse.length === 0) return {};
+    if (!skusToUse || skusToUse.length === 0) {
+      logger.warn('No SKUs available for country', { 
+        selectedCountry, 
+        filteredSkusCount: filteredSkus?.length || 0,
+        allSkusCount: data?.skus?.length || 0 
+      });
+      return {};
+    }
     
-    // Create maps for sorting and category lookup
-    const skuMap = new Map(skusToUse.map(sku => [sku.id, sku]));
-    const skuSortOrderMap = new Map(skusToUse.map(sku => [sku.id, sku.sortOrder != null ? sku.sortOrder : Number.MAX_SAFE_INTEGER]));
-    const skuNameMap = new Map(skusToUse.map(sku => [sku.id, sku.name || '']));
+    // Normalize GUIDs for comparison (case-insensitive)
+    const normalizeGuid = (guid) => String(guid || '').toLowerCase().trim();
+    
+    // Create maps for sorting and category lookup (using normalized IDs for keys)
+    const normalizedSkuMap = new Map(skusToUse.map(sku => [normalizeGuid(sku.id), sku]));
+    const skuIdToNormalizedMap = new Map(skusToUse.map(sku => [normalizeGuid(sku.id), sku.id]));
+    const skuSortOrderMap = new Map(skusToUse.map(sku => [normalizeGuid(sku.id), sku.sortOrder != null ? sku.sortOrder : Number.MAX_SAFE_INTEGER]));
+    const skuNameMap = new Map(skusToUse.map(sku => [normalizeGuid(sku.id), sku.name || '']));
     
     // Filter stockCoverData to only include SKUs assigned to the country
+    // Use normalized GUID comparison to handle case differences
     const filteredStockCover = {};
+    let matchesCount = 0;
+    let nonMatchesCount = 0;
+    const nonMatches = [];
+    
     Object.entries(stockCoverData).forEach(([skuId, skuData]) => {
-      // Only include SKUs that are in the filtered SKU list
-      if (skuMap.has(skuId)) {
-        filteredStockCover[skuId] = skuData;
+      const normalizedSkuId = normalizeGuid(skuId);
+      // Only include SKUs that are in the filtered SKU list (assigned to country)
+      if (normalizedSkuMap.has(normalizedSkuId)) {
+        // Use the original SKU ID from filteredSkus to ensure consistency
+        const originalSkuId = skuIdToNormalizedMap.get(normalizedSkuId) || skuId;
+        filteredStockCover[originalSkuId] = skuData;
+        matchesCount++;
+      } else {
+        nonMatchesCount++;
+        if (nonMatches.length < 5) {
+          nonMatches.push({ stockCoverSkuId: skuId, normalized: normalizedSkuId });
+        }
       }
     });
+    
+    // Log filtering results for debugging
+    if (nonMatchesCount > 0 && matchesCount === 0) {
+      logger.warn('Stock cover data filtering resulted in no matches', {
+        selectedCountry,
+        totalStockCoverSkus: Object.keys(stockCoverData).length,
+        filteredSkusCount: skusToUse.length,
+        matchesCount,
+        nonMatchesCount,
+        sampleNonMatches: nonMatches.slice(0, 3),
+        sampleStockCoverSkuIds: Object.keys(stockCoverData).slice(0, 3),
+        sampleFilteredSkuIds: skusToUse.slice(0, 3).map(s => s.id)
+      });
+    }
     
     // Group by category (Range): Standard (1), Genio (2), Special (3)
     // Only include these three categories as per user requirement
@@ -302,16 +340,28 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
     });
     
     // Add SKUs to their respective range groups
+    let skusWithCategory = 0;
+    let skusWithoutCategory = 0;
+    let skusWithInvalidCategory = 0;
+    const categoryBreakdown = { 1: 0, 2: 0, 3: 0, other: 0 };
     Object.entries(filteredStockCover).forEach(([skuId, skuData]) => {
-      const sku = skuMap.get(skuId);
+      const normalizedSkuId = normalizeGuid(skuId);
+      const sku = normalizedSkuMap.get(normalizedSkuId);
       const category = sku?.category;
+      const monthsCount = Object.keys(skuData.months || {}).length;
       
-      // Only include Standard (1), Genio (2), or Special (3)
-      if (category && [1, 2, 3].includes(category)) {
+      if (!category) {
+        skusWithoutCategory++;
+      } else if ([1, 2, 3].includes(category)) {
+        skusWithCategory++;
+        categoryBreakdown[category]++;
         if (!groupedByRange[category]) {
           groupedByRange[category] = { name: rangeNames[category] || 'Other', skus: {} };
         }
         groupedByRange[category].skus[skuId] = skuData;
+      } else {
+        skusWithInvalidCategory++;
+        categoryBreakdown.other++;
       }
     });
     
@@ -319,8 +369,8 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
     Object.keys(groupedByRange).forEach(rangeCode => {
       const entries = Object.entries(groupedByRange[rangeCode].skus);
       entries.sort(([skuIdA], [skuIdB]) => {
-        const sortOrderA = skuSortOrderMap.get(skuIdA) ?? Number.MAX_SAFE_INTEGER;
-        const sortOrderB = skuSortOrderMap.get(skuIdB) ?? Number.MAX_SAFE_INTEGER;
+        const sortOrderA = skuSortOrderMap.get(normalizeGuid(skuIdA)) ?? Number.MAX_SAFE_INTEGER;
+        const sortOrderB = skuSortOrderMap.get(normalizeGuid(skuIdB)) ?? Number.MAX_SAFE_INTEGER;
         
         // First sort by sortOrder
         if (sortOrderA !== sortOrderB) {
@@ -328,8 +378,8 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
         }
         
         // If sortOrder is the same (or both null), fallback to name
-        const nameA = skuNameMap.get(skuIdA) || skuIdA;
-        const nameB = skuNameMap.get(skuIdB) || skuIdB;
+        const nameA = skuNameMap.get(normalizeGuid(skuIdA)) || skuIdA;
+        const nameB = skuNameMap.get(normalizeGuid(skuIdB)) || skuIdB;
         return nameA.localeCompare(nameB);
       });
       
@@ -339,10 +389,24 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
     return groupedByRange;
   }, [stockCoverData, data?.skus, filteredSkus, selectedCountry]);
 
+  // Show loading state while app data is loading
+  // MUST be after all hooks to comply with Rules of Hooks
+  if (!data) {
+    return <LoadingState message="Loading application data..." />;
+  }
+
+  // Show country selection screen if no country is selected
+  const showCountrySelection = !selectedCountry;
+
   const measures = [
     { key: 'openingStock', label: 'Opening Stock', type: 'calc' },
-    { key: 'consumption', label: 'Consumption', type: 'calc' },
-    { key: 'orderItems', label: 'Orders', type: 'orderItems' },
+    { key: 'issuesFromStock', label: 'Issues from Stock', type: 'calc' },
+    { key: 'netSales', label: 'Net Sales', type: 'calc' },
+    { key: 'forecast', label: 'Sales Forecast', type: 'calc' },
+    { key: 'budget', label: 'Budget', type: 'calc' },
+    { key: 'budgetAchievement', label: 'Budget Achievement %', type: 'percentage' },
+    { key: 'ed', label: 'E&D', type: 'calc' },
+    { key: 'orderItems', label: 'Orders & Stocks Received', type: 'orderItems' },
     { key: 'closingStock', label: 'Closing Stock', type: 'calc' },
     { key: 'monthsCover', label: 'Months Cover', type: 'cover' }
   ];
@@ -467,7 +531,35 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
           {/* Show table when country is selected and data is loaded */}
           {!stockCoverLoading && (
             <>
-              <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-gray-200 overflow-hidden relative">
+              {/* Show message if no data found - check countryDataByRange instead of stockCoverData */}
+              {(() => {
+                const hasData = Object.values(countryDataByRange).some(range => 
+                  range && Object.keys(range.skus || {}).length > 0
+                );
+                return !hasData && !stockCoverLoading;
+              })() && (
+                <div className="flex-1 flex items-center justify-center bg-white rounded-xl border border-gray-200 p-8">
+                  <div className="text-center">
+                    <p className="text-lg font-medium text-gray-900 mb-2">No stock data found</p>
+                    <p className="text-sm text-gray-600 mb-4">
+                      No forecasts, budgets, order items, or inventory data found for this country.
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Check the browser console for detailed logging.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              {/* Show table if data exists - check countryDataByRange instead of stockCoverData */}
+              {(() => {
+                const hasData = Object.values(countryDataByRange).some(range => 
+                  range && Object.keys(range.skus || {}).length > 0
+                );
+                return hasData;
+              })() && (
+                <>
+                  <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-gray-200 overflow-hidden relative">
         {/* Scroll Indicator */}
         <div className="absolute top-2 right-2 z-30 bg-blue-600 text-white px-3 py-1 rounded-lg text-xs font-medium shadow-lg">
           Scroll → to view all months
@@ -495,25 +587,39 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
                     return (
                       <Fragment key={`range-${rangeCode}`}>
                         {/* Range Header Row - Sticky both vertically and horizontally */}
-                        <tr className="sticky bg-gradient-to-r from-blue-50 to-indigo-50 border-y-2 border-blue-200" style={{ top: '48px', zIndex: 30 }}>
+                        <tr className="sticky border-y-2 border-blue-200" style={{ top: '48px', zIndex: 30 }}>
+                          {/* Sticky first cell with text */}
                           <td 
-                            colSpan={months.length + years.length + 1} 
-                            className="px-4 py-3 font-bold text-lg text-gray-900 bg-gradient-to-r from-blue-50 to-indigo-50"
+                            className="px-4 py-3 font-bold text-lg text-gray-900"
                             style={{ 
                               position: 'sticky',
                               left: 0,
                               top: '48px',
-                              zIndex: 31
+                              zIndex: 35,
+                              backgroundColor: 'rgb(239 246 255)',
+                              backgroundImage: 'linear-gradient(to right, rgb(239 246 255), rgb(224 231 255))',
+                              minWidth: '260px',
+                              width: '260px',
+                              whiteSpace: 'nowrap',
+                              boxShadow: '2px 0 4px rgba(0, 0, 0, 0.1)'
                             }}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="text-blue-600">📦</span>
-                              <span>{rangeName} Range</span>
-                              <span className="text-sm font-normal text-gray-500">
+                              <span className="text-blue-600 flex-shrink-0">📦</span>
+                              <span className="flex-shrink-0 whitespace-nowrap">{rangeName} Range</span>
+                              <span className="text-sm font-normal text-gray-500 flex-shrink-0 whitespace-nowrap">
                                 ({skuEntries.length} {skuEntries.length === 1 ? 'SKU' : 'SKUs'})
                               </span>
                             </div>
                           </td>
+                          {/* Remaining cells that scroll */}
+                          <td 
+                            colSpan={months.length + years.length}
+                            className="px-4 py-3 bg-gradient-to-r from-blue-50 to-indigo-50"
+                            style={{ 
+                              top: '48px'
+                            }}
+                          ></td>
                         </tr>
                         
                         {/* SKU Rows for this Range */}
@@ -549,7 +655,7 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
       </div>
       
       {/* Legend */}
-            <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 mt-4 px-1">
+      <div className="flex flex-wrap items-center gap-6 text-sm text-gray-500 mt-4 px-1">
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded bg-blue-50 border border-blue-200"></div>
                 <span>Current Month</span>
@@ -563,8 +669,10 @@ export const StockManagementPage = ({ onCreateOrder, onViewOrder }) => {
                 <span>Odd Months</span>
               </div>
             </div>
-            </>
-          )}
+          </>
+        )}
+      </>
+    )}
         </>
       )}
 

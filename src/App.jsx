@@ -6,7 +6,7 @@ import { Navigation } from '@/components/index.js';
 import { initMessageApi } from '@/utils/message.js';
 import { 
   HomePage, 
-  StockManagementPage, 
+  StockManagementPage,
   ForecastsPage, 
   AllocationsPage, 
   ShipmentsPage,
@@ -16,7 +16,9 @@ import {
   ReportsPage,
   SettingsPage,
   DataverseTestPage,
-  LandingPage
+  LandingPage,
+  CalculationSchemaPage,
+  CalculationTestPage
 } from '@/pages/index.js';
 
 /**
@@ -83,6 +85,10 @@ function App() {
         return <SettingsPage />;
       case 'dataverse-test':
         return <DataverseTestPage />;
+      case 'calculation-schema':
+        return <CalculationSchemaPage />;
+      case 'calculation-test':
+        return <CalculationTestPage />;
       default:
         return <HomePage />;
     }

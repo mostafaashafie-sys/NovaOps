@@ -9,3 +9,4 @@ export { default as ErrorState } from './ErrorState.jsx';
 export { default as FilterBar } from './FilterBar.jsx';
 export { default as OrderPill } from './OrderPill.jsx';
 export { default as PODetailsModal } from './PODetailsModal.jsx';
+export { default as DataverseColumnSelector } from '../DataverseColumnSelector.jsx';

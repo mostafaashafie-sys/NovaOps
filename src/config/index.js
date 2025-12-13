@@ -3,9 +3,9 @@
  * Centralized exports for all configuration
  */
 
-export { DataverseConfig } from './dataverse.config.js';
 export { 
-  DataverseSchema, 
+  DataverseSchema,
+  DATAVERSE_BASE_URL,
   getTableSchema, 
   getTableName, 
   getPrimaryKey, 

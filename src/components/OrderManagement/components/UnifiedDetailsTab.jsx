@@ -385,47 +385,100 @@ export const UnifiedDetailsTab = ({
     <div className="space-y-5">
       {/* Lifecycle Progress */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-200">
-        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <span className="text-lg">🔄</span>
-          Order Lifecycle
-        </h3>
-        <div className="relative">
-          {/* Progress line */}
-          <div className="absolute top-4 sm:top-5 md:top-6 left-0 right-0 h-0.5 sm:h-1 bg-gray-200 rounded-full"></div>
-          <div 
-            className="absolute top-4 sm:top-5 md:top-6 left-0 h-0.5 sm:h-1 bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all duration-500"
-            style={{ width: currentStageIndex >= 0 ? `${((currentStageIndex + 1) / lifecycleStages.length) * 100}%` : '0%' }}
-          ></div>
-          
-          {/* Stages */}
-          <div className="relative flex justify-between overflow-x-auto pb-2 -mx-2 px-2">
-            {lifecycleStages.map((stage, idx) => {
-              const isActive = orderItem.status === stage.status;
-              const isPast = currentStageIndex > idx;
-              const isCurrent = currentStageIndex === idx;
-              
-              return (
-                <div key={stage.status} className="flex flex-col items-center flex-1 min-w-0 px-1">
-                  <div
-                    className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center text-sm sm:text-base md:text-xl font-semibold transition-all duration-300 z-10 flex-shrink-0 ${
-                      isCurrent
-                        ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-110'
-                        : isPast
-                        ? 'bg-green-500 text-white shadow-md'
-                        : 'bg-gray-200 text-gray-500'
-                    }`}
+        <div className="space-y-3">
+          {/* Two-row layout: First 4 stages */}
+          <div className="relative">
+            {/* Progress line for first row */}
+            <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 rounded-full"></div>
+            <div 
+              className="absolute top-5 left-0 h-1 bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all duration-500 z-0"
+              style={{ 
+                width: currentStageIndex >= 0 && currentStageIndex < 4
+                  ? `${((currentStageIndex + 1) / 4) * 100}%` 
+                  : currentStageIndex >= 4
+                  ? '100%'
+                  : '0%'
+              }}
+            ></div>
+            
+            <div className="relative flex justify-between gap-2">
+              {lifecycleStages.slice(0, 4).map((stage, idx) => {
+                const isPast = currentStageIndex > idx;
+                const isCurrent = currentStageIndex === idx;
+                
+                return (
+                  <div 
+                    key={stage.status} 
+                    className="flex flex-col items-center flex-1 relative z-10"
+                    title={stage.label}
                   >
-                    {stage.icon}
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-semibold transition-all duration-300 flex-shrink-0 ${
+                        isCurrent
+                          ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-110 ring-2 ring-blue-300'
+                          : isPast
+                          ? 'bg-green-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {stage.icon}
+                    </div>
+                    <p className={`text-[11px] mt-2 text-center font-medium leading-tight break-words w-full ${
+                      isCurrent ? 'text-blue-600 font-semibold' : isPast ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      {stage.label}
+                    </p>
                   </div>
-                  <p className={`text-[10px] sm:text-xs mt-1 sm:mt-2 text-center font-medium leading-tight ${
-                    isCurrent ? 'text-blue-600 font-semibold' : isPast ? 'text-green-600' : 'text-gray-500'
-                  }`}>
-                    <span className="hidden sm:inline">{stage.label}</span>
-                    <span className="sm:hidden">{stage.label.split(' ')[0]}</span>
-                  </p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Two-row layout: Last 4 stages */}
+          <div className="relative">
+            {/* Progress line for second row */}
+            <div className="absolute top-5 left-0 right-0 h-1 bg-gray-200 rounded-full"></div>
+            <div 
+              className="absolute top-5 left-0 h-1 bg-gradient-to-r from-blue-500 to-green-500 rounded-full transition-all duration-500 z-0"
+              style={{ 
+                width: currentStageIndex >= 4
+                  ? `${((currentStageIndex - 3) / 4) * 100}%` 
+                  : '0%'
+              }}
+            ></div>
+            
+            <div className="relative flex justify-between gap-2">
+              {lifecycleStages.slice(4, 8).map((stage, idx) => {
+                const actualIdx = idx + 4;
+                const isPast = currentStageIndex > actualIdx;
+                const isCurrent = currentStageIndex === actualIdx;
+                
+                return (
+                  <div 
+                    key={stage.status} 
+                    className="flex flex-col items-center flex-1 relative z-10"
+                    title={stage.label}
+                  >
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center text-base font-semibold transition-all duration-300 flex-shrink-0 ${
+                        isCurrent
+                          ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-110 ring-2 ring-blue-300'
+                          : isPast
+                          ? 'bg-green-500 text-white shadow-md'
+                          : 'bg-gray-200 text-gray-500'
+                      }`}
+                    >
+                      {stage.icon}
+                    </div>
+                    <p className={`text-[11px] mt-2 text-center font-medium leading-tight break-words w-full ${
+                      isCurrent ? 'text-blue-600 font-semibold' : isPast ? 'text-green-600' : 'text-gray-500'
+                    }`}>
+                      {stage.label}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -436,38 +489,115 @@ export const UnifiedDetailsTab = ({
           <span className="text-lg">📦</span>
           Order Details
         </h3>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="space-y-2">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">SKU:</span>
-              <span className="font-semibold text-gray-900">{orderItem.skuName}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Country:</span>
-              <span className="font-semibold text-gray-900">{orderItem.countryName}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Quantity:</span>
-              <span className="font-semibold text-blue-600">{formatNumber(orderItem.qtyCartons)} cartons</span>
-            </div>
-          </div>
-          <div className="space-y-2">
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Delivery Month:</span>
-              <span className="font-medium">{orderItem.deliveryMonth}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-gray-100">
-              <span className="text-gray-600">Status:</span>
-              <StatusBadge status={orderItem.status} />
-            </div>
-            {(orderItem.poName || orderItem.poId) && (
-              <div className="flex justify-between items-center py-2">
-                <span className="text-gray-600">PO:</span>
-                <span className="font-mono text-sm font-semibold text-indigo-600">{orderItem.poName || orderItem.poId}</span>
+        {(() => {
+          // Calculate deliveryMonth from year and month if missing
+          let deliveryMonth = orderItem.deliveryMonth;
+          if (!deliveryMonth && orderItem.year && orderItem.month) {
+            deliveryMonth = `${orderItem.year}-${String(orderItem.month).padStart(2, '0')}`;
+          }
+          
+          // Look up month label if available
+          const monthLabel = data?.months?.find(m => m.key === deliveryMonth)?.label || deliveryMonth;
+          
+          // Look up SKU name - check multiple sources
+          let skuName = orderItem.skuName;
+          if (!skuName) {
+            // Try from expanded sku object
+            if (orderItem.sku) {
+              skuName = orderItem.sku.skuName || orderItem.sku.name;
+            }
+            // Try from skuId lookup
+            if (!skuName && orderItem.skuId) {
+              const sku = data?.skus?.find(s => s.id === orderItem.skuId);
+              skuName = sku?.name || sku?.skuName;
+            }
+            // Try from filter field value
+            if (!skuName && orderItem._new_sku_value) {
+              const sku = data?.skus?.find(s => s.id === orderItem._new_sku_value);
+              skuName = sku?.name || sku?.skuName;
+            }
+            // Debug: log if we still don't have a name
+            if (!skuName) {
+              console.warn('SKU name not found for orderItem', {
+                orderItemId: orderItem.id,
+                skuName: orderItem.skuName,
+                skuId: orderItem.skuId,
+                _new_sku_value: orderItem._new_sku_value,
+                sku: orderItem.sku,
+                availableSkus: data?.skus?.length || 0
+              });
+              // Show ID if available, otherwise show unknown
+              skuName = orderItem.skuId || orderItem._new_sku_value || 'Unknown SKU';
+            }
+          }
+          
+          // Look up country name - check multiple sources
+          let countryName = orderItem.countryName;
+          if (!countryName) {
+            // Try from expanded country object
+            if (orderItem.country) {
+              countryName = orderItem.country.countryName || orderItem.country.name;
+            }
+            // Try from countryId lookup
+            if (!countryName && orderItem.countryId) {
+              const country = data?.countries?.find(c => c.id === orderItem.countryId);
+              countryName = country?.name || country?.countryName;
+            }
+            // Try from filter field value
+            if (!countryName && orderItem._new_country_value) {
+              const country = data?.countries?.find(c => c.id === orderItem._new_country_value);
+              countryName = country?.name || country?.countryName;
+            }
+            // Debug: log if we still don't have a name
+            if (!countryName) {
+              console.warn('Country name not found for orderItem', {
+                orderItemId: orderItem.id,
+                countryName: orderItem.countryName,
+                countryId: orderItem.countryId,
+                _new_country_value: orderItem._new_country_value,
+                country: orderItem.country,
+                availableCountries: data?.countries?.length || 0
+              });
+              // Show ID if available, otherwise show unknown
+              countryName = orderItem.countryId || orderItem._new_country_value || 'Unknown Country';
+            }
+          }
+          
+          return (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600">SKU:</span>
+                  <span className="font-semibold text-gray-900">{skuName}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Country:</span>
+                  <span className="font-semibold text-gray-900">{countryName}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Quantity:</span>
+                  <span className="font-semibold text-blue-600">{formatNumber(orderItem.qtyCartons || orderItem.qtyInCartons || 0)} cartons</span>
+                </div>
               </div>
-            )}
-          </div>
-        </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Delivery Month:</span>
+                  <span className="font-medium">{monthLabel}</span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                  <span className="text-gray-600">Status:</span>
+                  <StatusBadge status={orderItem.status} />
+                </div>
+                {(orderItem.poName || orderItem.poId) && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-gray-600">PO:</span>
+                    <span className="font-mono text-sm font-semibold text-indigo-600">{orderItem.poName || orderItem.poId}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         {orderItem.isSystemGenerated && (
           <div className="mt-3 flex items-center gap-2">
             <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">

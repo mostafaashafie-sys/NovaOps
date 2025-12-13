@@ -21,9 +21,25 @@ export const PanelHeader = ({ orderItem, onClose }) => {
       {orderItem && (
         <div className="flex items-center gap-2 flex-wrap">
           <StatusBadge status={orderItem.status} />
-          <span className="text-sm opacity-90 font-mono">{orderItem.id}</span>
-          {orderItem.poId && (
-            <span className="text-xs bg-white/20 px-2 py-1 rounded">PO: {orderItem.poId}</span>
+          <span className="text-sm opacity-90 font-semibold">
+            {orderItem.skuName || 'Unknown SKU'}
+          </span>
+          <span className="text-xs opacity-75">•</span>
+          <span className="text-xs opacity-90">
+            {orderItem.deliveryMonth || 'No month'}
+          </span>
+          {orderItem.poId || orderItem.poName ? (
+            <>
+              <span className="text-xs opacity-75">•</span>
+              <span className="text-xs bg-white/20 px-2 py-1 rounded">
+                PO: {orderItem.poName || orderItem.poId}
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="text-xs opacity-75">•</span>
+              <span className="text-xs opacity-70 italic">No PO</span>
+            </>
           )}
         </div>
       )}

@@ -1,5 +1,4 @@
 import DataverseDataService from './DataverseDataService.js';
-import { DataverseConfig } from '@/config/index.js';
 import { Logger } from '@/utils/index.js';
 
 const logger = new Logger('OrderItemService');

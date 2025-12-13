@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '@/providers/index.js';
 import { PageHeader, Card } from '@/components/index.js';
-import { DataverseConfig } from '@/config/index.js';
+import { DATAVERSE_BASE_URL } from '@/config/dataverse-schema.js';
 
 /**
  * Settings Page Component
@@ -11,7 +11,7 @@ export const SettingsPage = () => {
   const { data } = useApp();
   const [settings, setSettings] = useState({
     useMockData: true,
-    dataverseUrl: DataverseConfig.baseUrl,
+    dataverseUrl: DATAVERSE_BASE_URL,
     autoRefresh: true,
     refreshInterval: 30, // seconds
     notifications: true,
@@ -35,7 +35,7 @@ export const SettingsPage = () => {
     if (confirm('Are you sure you want to reset all settings to default?')) {
       const defaultSettings = {
         useMockData: true,
-        dataverseUrl: DataverseConfig.baseUrl,
+        dataverseUrl: DATAVERSE_BASE_URL,
         autoRefresh: true,
         refreshInterval: 30,
         notifications: true,

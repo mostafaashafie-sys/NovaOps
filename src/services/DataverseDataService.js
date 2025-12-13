@@ -4,9 +4,9 @@
  * Uses schema from dataverse-schema.js based on DATAVERSE_SCHEMA_MAPPING.md
  */
 
-import { DataverseConfig } from '@/config/index.js';
 import { 
   DataverseSchema, 
+  DATAVERSE_BASE_URL,
   getTableSchema, 
   getTableName, 
   getPrimaryKey, 
@@ -21,9 +21,13 @@ const logger = new Logger('DataverseDataService');
 
 class DataverseDataService {
   constructor() {
-    this.baseUrl = DataverseConfig.baseUrl;
+    this.baseUrl = DATAVERSE_BASE_URL;
     this.token = null;
     this.tokenExpiry = null;
+    // Cache for entity logical name mapping (EntitySetName -> LogicalName)
+    this.entityLogicalNameCache = null;
+    this.entityLogicalNameCacheTime = null;
+    this.entityLogicalNameCacheTimeout = 1000 * 60 * 60; // Cache for 1 hour
   }
 
   /**
@@ -108,12 +112,32 @@ class DataverseDataService {
       error.errorText = errorText;
       error.endpoint = endpoint;
       
+      // Try to parse error as JSON for better error details
+      let errorDetails = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetails = errorJson;
+        error.error = errorJson;
+        // Extract OData error message if available
+        if (errorJson.error && errorJson.error.message) {
+          error.message = errorJson.error.message;
+          error.odataError = errorJson.error;
+        }
+      } catch (e) {
+        // Not JSON, use as-is
+      }
+      
       // Log 404s as warnings (expected for entity discovery/verification)
-      // Log other errors as errors
+      // Log other errors as errors with full details
       if (response.status === 404) {
         logger.warn(`Dataverse API 404: ${endpoint}`, { endpoint, errorText });
       } else {
-        logger.error(`Dataverse API error: ${response.status}`, { endpoint, errorText });
+        logger.error(`Dataverse API error: ${response.status}`, { 
+          endpoint, 
+          errorText, 
+          errorDetails,
+          parsedError: error.odataError || errorDetails
+        });
       }
       throw error;
     }
@@ -137,6 +161,7 @@ class DataverseDataService {
 
     const schema = getTableSchema(schemaKey);
     const filterParts = [];
+    
     
     // Map friendly filter names to lookup field names
     const friendlyToLookupMap = {
@@ -170,6 +195,7 @@ class DataverseDataService {
         columnName = getColumnName(schemaKey, key);
       }
       
+      
       if (Array.isArray(value)) {
         // Handle IN clause: field eq 'value1' or field eq 'value2'
         const orParts = value.map(v => `${columnName} eq ${this.formatFilterValue(v)}`).join(' or ');
@@ -179,7 +205,9 @@ class DataverseDataService {
       }
     }
     
-    return filterParts.length > 0 ? `$filter=${filterParts.join(' and ')}` : '';
+    const filterString = filterParts.length > 0 ? `$filter=${filterParts.join(' and ')}` : '';
+    
+    return filterString;
   }
 
   /**
@@ -1016,18 +1044,266 @@ class DataverseDataService {
   }
 
   // ===========================================================================
+  // CALCULATION MAPPINGS
+  // ===========================================================================
+
+  async getCalculationMappings(filters = {}) {
+    // Remove isActive filter if it exists (column doesn't exist)
+    const cleanFilters = { ...filters };
+    if ('isActive' in cleanFilters) {
+      delete cleanFilters.isActive;
+    }
+    
+    // Build query - only select fields that exist (backward compatible)
+    // The new fields (aggregationType, filterLogic, etc.) may not exist in Dataverse yet
+    const baseSelect = [
+      'new_calculationmappingid',
+      'new_name',
+      'new_measurekey',
+      'new_sourcetable',
+      'new_fieldname',
+      'new_doctypepatterns',
+      'new_channelpatterns',
+      'new_sign',
+      'new_quantityfield',
+      'new_mappingtype',
+      'new_configuration',
+      'new_sortorder'
+    ];
+    
+    // Try to include new fields, but fallback gracefully if they don't exist
+    const newFields = [
+      'new_aggregationtype',
+      'new_filterlogic',
+      'new_groupbycolumns',
+      'new_calculationexpression'
+    ];
+    
+    // Build query using defaultSelect from schema (which uses friendly names)
+    // This will automatically map to Dataverse column names
+    // Note: New fields (aggregationType, filterLogic, etc.) are not in defaultSelect
+    // until they are added to the Dataverse table
+    const query = this.buildQuery('calculationMappings', { 
+      filter: cleanFilters
+      // Don't specify select - let buildQuery use defaultSelect from schema
+    });
+    
+    const result = await this.fetch(`/${getTableName('calculationMappings')}${query}`);
+    const transformed = this.transformResponse('calculationMappings', result);
+    return transformed.value || transformed;
+  }
+
+  async getCalculationMappingById(mappingId) {
+    const query = this.buildQuery('calculationMappings', {
+      // Don't expand country/sku since they don't exist
+    });
+    const result = await this.fetch(`/${getTableName('calculationMappings')}(${mappingId})${query}`);
+    return this.transformResponse('calculationMappings', result);
+  }
+
+  /**
+   * Convert option set string value to numeric value
+   * @param {string} fieldName - Field name (e.g., 'aggregationType', 'sign', 'mappingType')
+   * @param {string|number} value - String value (e.g., 'sum', 'SUM') or numeric value
+   * @param {Object} schema - Schema object with statusCodes
+   * @returns {number|undefined} - Numeric option set value or undefined if not found
+   */
+  _convertOptionSetValue(fieldName, value, schema) {
+    // If already a number, return as-is (assuming it's a valid option set value)
+    if (typeof value === 'number') {
+      return value;
+    }
+    
+    // If not a string, can't convert
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+    
+    // Get statusCodes for this field
+    const statusCodes = schema.statusCodes?.[fieldName];
+    if (!statusCodes) {
+      return undefined;
+    }
+    
+    // Normalize the string value (uppercase, trim)
+    const normalizedValue = value.trim().toUpperCase();
+    
+    // Find matching label in statusCodes (reverse lookup: label -> value)
+    for (const [numericValue, label] of Object.entries(statusCodes)) {
+      if (label.toUpperCase() === normalizedValue) {
+        return parseInt(numericValue, 10);
+      }
+    }
+    
+    // If no match found, return undefined
+    return undefined;
+  }
+
+  async createCalculationMapping(data) {
+    const schema = getTableSchema('calculationMappings');
+    const payload = {};
+    
+    // Map friendly names to Dataverse column names (similar to createOrderItem, createForecast)
+    for (const [key, value] of Object.entries(data)) {
+      // Skip isActive, country, sku if they don't exist in table
+      if (key === 'isActive' || key === 'country' || key === 'sku' || key === 'countryId' || key === 'skuId') {
+        continue; // Skip these fields
+      }
+      
+      // Only include fields that exist in schema and have valid values
+      if (schema.columns[key]) {
+        // Skip null, undefined, and empty strings (Dataverse might not accept empty strings)
+        if (value === undefined || value === null) {
+          continue;
+        }
+        
+        // For string fields, skip empty strings unless it's a required field
+        if (typeof value === 'string' && value.trim() === '' && key !== 'name') {
+          continue; // Skip empty strings except for name (which might be required)
+        }
+        
+        const dataverseColumnName = getColumnName('calculationMappings', key);
+        let finalValue = value;
+        
+        // Handle option set fields: convert string values to numeric option set values
+        if (key === 'aggregationType' || key === 'sign' || key === 'mappingType') {
+          const convertedValue = this._convertOptionSetValue(key, value, schema);
+          if (convertedValue !== undefined) {
+            finalValue = convertedValue;
+          } else if (typeof value === 'string') {
+            // If conversion failed and it's still a string, skip this field to avoid errors
+            logger.warn(`Could not convert ${key} value "${value}" to option set value, skipping field`);
+            continue;
+          }
+        }
+        
+        // sortOrder is a string field, others are sent as-is
+        if (key === 'sortOrder' && typeof finalValue === 'number') {
+          payload[dataverseColumnName] = String(finalValue);
+        } else {
+          payload[dataverseColumnName] = finalValue;
+        }
+      }
+    }
+    
+    // Log the payload for debugging
+    logger.info('Creating calculation mapping', { 
+      payloadKeys: Object.keys(payload),
+      payload: payload
+    });
+    
+    const result = await this.fetch(`/${getTableName('calculationMappings')}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+    });
+    return this.transformResponse('calculationMappings', result);
+  }
+
+  async updateCalculationMapping(mappingId, data) {
+    const schema = getTableSchema('calculationMappings');
+    const payload = {};
+    
+    // Map friendly names to Dataverse column names
+    for (const [key, value] of Object.entries(data)) {
+      // Skip isActive, country, sku if they don't exist in table
+      if (key === 'isActive' || key === 'country' || key === 'sku' || key === 'countryId' || key === 'skuId') {
+        continue; // Skip these fields
+      }
+      
+      // Only include fields that exist in schema and have valid values
+      if (schema.columns[key]) {
+        // Skip null, undefined, and empty strings (Dataverse might not accept empty strings)
+        if (value === undefined || value === null) {
+          continue;
+        }
+        
+        // For string fields, skip empty strings unless it's a required field
+        if (typeof value === 'string' && value.trim() === '' && key !== 'name') {
+          continue; // Skip empty strings except for name (which might be required)
+        }
+        
+        const dataverseColumnName = getColumnName('calculationMappings', key);
+        let finalValue = value;
+        
+        // Handle option set fields: convert string values to numeric option set values
+        if (key === 'aggregationType' || key === 'sign' || key === 'mappingType') {
+          const convertedValue = this._convertOptionSetValue(key, value, schema);
+          if (convertedValue !== undefined) {
+            finalValue = convertedValue;
+          } else if (typeof value === 'string') {
+            // If conversion failed and it's still a string, skip this field to avoid errors
+            logger.warn(`Could not convert ${key} value "${value}" to option set value, skipping field`);
+            continue;
+          }
+        }
+        
+        // sortOrder is a string field, others are sent as-is
+        if (key === 'sortOrder' && typeof finalValue === 'number') {
+          payload[dataverseColumnName] = String(finalValue);
+        } else {
+          payload[dataverseColumnName] = finalValue;
+        }
+      }
+    }
+    
+    const result = await this.fetch(`/${getTableName('calculationMappings')}(${mappingId})`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation',
+      },
+    });
+    return this.transformResponse('calculationMappings', result);
+  }
+
+  async deleteCalculationMapping(mappingId) {
+    await this.fetch(`/${getTableName('calculationMappings')}(${mappingId})`, {
+      method: 'DELETE',
+    });
+    return { success: true };
+  }
+
+  // ===========================================================================
   // SKU COUNTRY ASSIGNMENT
   // ===========================================================================
 
   async getSkuCountryAssignments(filters = {}) {
+    
     // Expand SKU and Country lookups to get IDs and names
     const query = this.buildQuery('skuCountryAssignments', { 
       filter: filters,
       expand: ['sku', 'country'] // Expand to get SKU and Country IDs
     });
-    const result = await this.fetch(`/${getTableName('skuCountryAssignments')}${query}`);
+    const tableName = getTableName('skuCountryAssignments');
+    const fullUrl = `/${tableName}${query}`;
+    
+    logger.info('Fetching SKU country assignments', {
+      filters,
+      query,
+      fullUrl,
+      tableName
+    });
+    
+    const result = await this.fetch(fullUrl);
+    
     const transformed = this.transformResponse('skuCountryAssignments', result);
-    return transformed.value || transformed;
+    
+    const assignments = transformed.value || transformed;
+    
+    logger.info('SKU country assignments fetched', {
+      filters,
+      resultType: Array.isArray(assignments) ? 'array' : typeof assignments,
+      count: Array.isArray(assignments) ? assignments.length : 'N/A',
+      sampleResult: Array.isArray(assignments) && assignments.length > 0 ? assignments[0] : null,
+      rawResult: result
+    });
+    
+    return assignments;
   }
 
   // ===========================================================================
@@ -1171,6 +1447,170 @@ class DataverseDataService {
     return statusValue;
   }
 
+  /**
+   * Get entity logical name from EntitySetName (table name)
+   * Dynamically discovers the mapping by querying EntityDefinitions
+   * Caches the result for performance
+   * 
+   * @param {string} tableName - EntitySetName (OData table name, e.g., 'new_rawaggregateds')
+   * @returns {Promise<string|null>} - Entity logical name (e.g., 'new_rawaggregated') or null if not found
+   */
+  async getEntityLogicalName(tableName) {
+    // Check cache first
+    if (this.entityLogicalNameCache && 
+        this.entityLogicalNameCacheTime && 
+        (Date.now() - this.entityLogicalNameCacheTime) < this.entityLogicalNameCacheTimeout) {
+      const cached = this.entityLogicalNameCache[tableName];
+      if (cached) {
+        return cached;
+      }
+    }
+
+    try {
+      // Fetch all EntityDefinitions to build the mapping
+      logger.info('Fetching EntityDefinitions to build EntitySetName -> LogicalName mapping');
+      const response = await this.fetch('/EntityDefinitions?$select=LogicalName,EntitySetName');
+      const entities = response.value || [];
+
+      // Build mapping: EntitySetName -> LogicalName
+      const mapping = {};
+      entities.forEach(entity => {
+        if (entity.EntitySetName && entity.LogicalName) {
+          mapping[entity.EntitySetName] = entity.LogicalName;
+        }
+      });
+
+      // Cache the mapping
+      this.entityLogicalNameCache = mapping;
+      this.entityLogicalNameCacheTime = Date.now();
+
+      logger.info('Entity logical name mapping built', {
+        totalEntities: entities.length,
+        mappedEntities: Object.keys(mapping).length,
+        requestedTable: tableName,
+        found: mapping[tableName] || 'NOT FOUND',
+        sampleMappings: Object.entries(mapping).slice(0, 10)
+      });
+
+      const logicalName = mapping[tableName];
+      if (!logicalName) {
+        logger.warn(`Entity logical name not found for table ${tableName}`, {
+          availableTables: Object.keys(mapping).filter(k => k.includes('raw') || k.includes('aggregated')).slice(0, 5)
+        });
+      }
+      return logicalName || null;
+    } catch (error) {
+      logger.error('Failed to fetch EntityDefinitions for logical name mapping', error);
+      // Return null if fetch fails - will fallback to other strategies
+      return null;
+    }
+  }
+
+  /**
+   * Get option set values for a field in a table
+   * Generic method that works for any table/field combination
+   * 
+   * @param {string} schemaKey - Schema key (e.g., 'rawAggregated')
+   * @param {string} fieldName - Field name (e.g., 'docType', 'channel')
+   * @returns {Promise<Object>} - Map of option set value (number) to label (string)
+   */
+  async getFieldOptionSetValues(schemaKey, fieldName) {
+    // First, check the schema - it's the source of truth
+    const schema = getTableSchema(schemaKey);
+    if (schema.statusCodes?.[fieldName] && Object.keys(schema.statusCodes[fieldName]).length > 0) {
+      return schema.statusCodes[fieldName];
+    }
+
+    // If not in schema, try to fetch from Dataverse metadata (fallback only)
+    try {
+      const tableName = getTableName(schemaKey);
+      const columnName = getColumnName(schemaKey, fieldName);
+
+      // Get entity logical name dynamically
+      const entityLogicalName = await this.getEntityLogicalName(tableName);
+      
+      if (!entityLogicalName) {
+        logger.debug(`Could not find entity logical name for table ${tableName}, field ${fieldName} not in schema`);
+        return {};
+      }
+
+      // Fetch attribute metadata
+      const response = await this.fetch(
+        `/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes(LogicalName='${columnName}')`
+      );
+
+      // Check if it's a global option set (by OptionSetName)
+      if (response.OptionSetName) {
+        const globalOptionSets = await this.fetch('/GlobalOptionSetDefinitions');
+        const globalOptionSet = globalOptionSets.value?.find(
+          os => os.Name === response.OptionSetName
+        );
+
+        if (globalOptionSet && globalOptionSet.Options) {
+          const values = {};
+          globalOptionSet.Options.forEach(option => {
+            if (option.Value != null) {
+              values[option.Value] = option.Label?.UserLocalizedLabel?.Label || option.Label || `Value ${option.Value}`;
+            }
+          });
+          logger.debug(`Found global option set ${response.OptionSetName} for field ${fieldName} in ${tableName} (not in schema - consider adding to schema)`);
+          return values;
+        }
+      }
+
+      // Check for local option set
+      const optionSetMetadata = response.OptionSet;
+      if (optionSetMetadata && optionSetMetadata.Options) {
+        const values = {};
+        optionSetMetadata.Options.forEach(option => {
+          if (option.Value != null) {
+            values[option.Value] = option.Label?.UserLocalizedLabel?.Label || option.Label || `Value ${option.Value}`;
+          }
+        });
+        logger.debug(`Found local option set for field ${fieldName} in ${tableName} (not in schema - consider adding to schema)`);
+        return values;
+      }
+
+      // If field is text but might reference a global option set by convention,
+      // try to find a global option set with a related name (e.g., "DocType", "new_doctype")
+      // This is a fallback for cases where text fields have associated global option sets
+      if (fieldName.toLowerCase().includes('doctype') || columnName.toLowerCase().includes('doctype')) {
+        try {
+          logger.debug(`Field ${fieldName} appears to be text, checking for related global option sets...`);
+          const globalOptionSets = await this.fetch('/GlobalOptionSetDefinitions');
+          const relatedOptionSets = (globalOptionSets.value || []).filter(os => {
+            const name = os.Name?.toLowerCase() || '';
+            return name.includes('doctype') || name.includes('doc_type') || name.includes('documenttype');
+          });
+          
+          if (relatedOptionSets.length > 0) {
+            // Use the first matching global option set
+            const globalOptionSet = relatedOptionSets[0];
+            const values = {};
+            (globalOptionSet.Options || []).forEach(option => {
+              if (option.Value != null) {
+                values[option.Value] = option.Label?.UserLocalizedLabel?.Label || option.Label || `Value ${option.Value}`;
+              }
+            });
+            if (Object.keys(values).length > 0) {
+              logger.info(`Found related global option set ${globalOptionSet.Name} for docType field (not in schema - consider adding to schema)`);
+              return values;
+            }
+          }
+        } catch (error) {
+          logger.debug(`Failed to check for related global option sets:`, error);
+        }
+      }
+
+      // No option set found
+      logger.debug(`Field ${fieldName} in table ${tableName} does not have an option set`);
+      return {};
+    } catch (error) {
+      logger.debug(`Failed to fetch option set values for ${schemaKey}.${fieldName} from Dataverse`, error);
+      return {};
+    }
+  }
+
   // ===========================================================================
   // FUTURE INVENTORY FORECASTS
   // ===========================================================================
@@ -1261,6 +1701,25 @@ class DataverseDataService {
   }
 
   // ===========================================================================
+  // DOC TYPES
+  // ===========================================================================
+
+  async getDocTypes(filters = {}) {
+    const query = this.buildQuery('docTypes', { 
+      filter: filters
+    });
+    const result = await this.fetch(`/${getTableName('docTypes')}${query}`);
+    const transformed = this.transformResponse('docTypes', result);
+    return transformed.value || transformed;
+  }
+
+  async getDocTypeById(docTypeId) {
+    const query = this.buildQuery('docTypes');
+    const result = await this.fetch(`/${getTableName('docTypes')}(${docTypeId})${query}`);
+    return this.transformResponse('docTypes', result);
+  }
+
+  // ===========================================================================
   // DOC TYPE CALCULATIONS
   // ===========================================================================
 
@@ -1271,6 +1730,151 @@ class DataverseDataService {
     const result = await this.fetch(`/${getTableName('docTypeCalculations')}${query}`);
     const transformed = this.transformResponse('docTypeCalculations', result);
     return transformed.value || transformed;
+  }
+
+  /**
+   * Get all columns (attributes) for an entity
+   * Dynamically fetches all fields from entity metadata
+   * 
+   * @param {string} schemaKey - Schema key (e.g., 'rawAggregated')
+   * @returns {Promise<Array>} - Array of field objects with {name, type, isOptionSet, optionSetName}
+   */
+  async getEntityColumns(schemaKey) {
+    try {
+      const tableName = getTableName(schemaKey);
+      const entityLogicalName = await this.getEntityLogicalName(tableName);
+      
+      
+      // Try to fetch attributes using discovered logical name
+      if (entityLogicalName) {
+        try {
+          // Fetch without $select - OptionSetName is not a selectable property
+          const response = await this.fetch(
+            `/EntityDefinitions(LogicalName='${entityLogicalName}')/Attributes`
+          );
+          
+          const attributes = response.value || [];
+          const columns = attributes
+            .filter(attr => {
+              // Filter out system fields and only include relevant types
+              const systemFields = ['createdon', 'modifiedon', 'createdby', 'modifiedby', 'ownerid', 'statecode', 'statuscode'];
+              return !systemFields.includes(attr.LogicalName?.toLowerCase()) &&
+                     attr.AttributeType !== 'Lookup' && // Exclude lookups for now
+                     attr.AttributeType !== 'Customer' &&
+                     attr.AttributeType !== 'Owner';
+            })
+            .map(attr => {
+              // Determine if it's an option set based on AttributeType only
+              // OptionSetName is not available in Attributes response
+              const isOptionSet = attr.AttributeType === 'Picklist' || 
+                                  attr.AttributeType === 'State' || 
+                                  attr.AttributeType === 'Status';
+              return {
+                name: attr.LogicalName,
+                columnName: attr.LogicalName,
+                type: attr.AttributeType,
+                isOptionSet,
+                optionSetName: undefined // OptionSetName not available in Attributes response
+              };
+            });
+
+          logger.info(`Fetched ${columns.length} columns for entity ${entityLogicalName}`);
+          return columns;
+        } catch (error) {
+          logger.warn(`Failed to fetch attributes using logical name ${entityLogicalName}, trying fallbacks`, error);
+          // Try fallback logical names
+          const fallbackNames = [
+            tableName,
+            tableName.endsWith('s') ? tableName.slice(0, -1) : tableName,
+            tableName.endsWith('es') ? tableName.slice(0, -2) : tableName
+          ];
+          
+          for (const fallbackName of fallbackNames) {
+            if (fallbackName === entityLogicalName) continue; // Skip if already tried
+            try {
+              // Fetch without $select - OptionSetName is not a selectable property
+              const response = await this.fetch(
+                `/EntityDefinitions(LogicalName='${fallbackName}')/Attributes`
+              );
+              const attributes = response.value || [];
+              const columns = attributes
+                .filter(attr => {
+                  const systemFields = ['createdon', 'modifiedon', 'createdby', 'modifiedby', 'ownerid', 'statecode', 'statuscode'];
+                  return !systemFields.includes(attr.LogicalName?.toLowerCase()) &&
+                         attr.AttributeType !== 'Lookup' &&
+                         attr.AttributeType !== 'Customer' &&
+                         attr.AttributeType !== 'Owner';
+                })
+                .map(attr => {
+                  // Determine if it's an option set based on AttributeType only
+                  // OptionSetName is not available in Attributes response
+                  const isOptionSet = attr.AttributeType === 'Picklist' || 
+                                      attr.AttributeType === 'State' || 
+                                      attr.AttributeType === 'Status';
+                  return {
+                    name: attr.LogicalName,
+                    columnName: attr.LogicalName,
+                    type: attr.AttributeType,
+                    isOptionSet,
+                    optionSetName: undefined // OptionSetName not available in Attributes response
+                  };
+                });
+              logger.info(`Fetched ${columns.length} columns using fallback name ${fallbackName}`);
+              return columns;
+            } catch (fallbackError) {
+              // Try next fallback
+              continue;
+            }
+          }
+        }
+      }
+      
+      // All attempts failed - fallback to schema columns
+      logger.warn(`Could not fetch columns from metadata for ${schemaKey}, using schema fallback`);
+      const schema = getTableSchema(schemaKey);
+      const columns = Object.keys(schema.columns || {}).map(key => ({
+        name: key,
+        columnName: getColumnName(schemaKey, key),
+        type: schema.columns[key]?.type || 'string',
+        isOptionSet: !!(schema.statusCodes?.[key]) // Check if it's an option set field
+      }));
+      
+      // Add common fields that might be missing from schema
+      if (schemaKey === 'rawAggregated') {
+        // Add quantity field if not present (it might be stored in 'name' or as 'qty')
+        if (!columns.find(c => c.name === 'quantity')) {
+          columns.push({ name: 'quantity', columnName: 'new_quantity', type: 'decimal', isOptionSet: false });
+        }
+        if (!columns.find(c => c.name === 'qty')) {
+          columns.push({ name: 'qty', columnName: 'new_qty', type: 'decimal', isOptionSet: false });
+        }
+      }
+      
+      return columns;
+    } catch (error) {
+      logger.error(`Failed to fetch columns for ${schemaKey}`, error);
+      // Fallback to schema columns
+      const schema = getTableSchema(schemaKey);
+      return Object.keys(schema.columns || {}).map(key => ({
+        name: key,
+        columnName: getColumnName(schemaKey, key),
+        type: schema.columns[key]?.type || 'string',
+        isOptionSet: false
+      }));
+    }
+  }
+
+  /**
+   * Get doc type option set values from raw aggregated entity metadata
+   * Uses dynamic entity discovery to find the correct entity logical name
+   * Returns a map of option set value (number) to label (string)
+   * 
+   * Note: docType may use a global option set even if not in schema statusCodes
+   */
+  async getDocTypeOptionSetValues() {
+    // Always try to fetch from Dataverse - it may be a global option set
+    // even if not configured in schema statusCodes
+    return this.getFieldOptionSetValues('rawAggregated', 'docType');
   }
 
   async createLabel(labelData) {

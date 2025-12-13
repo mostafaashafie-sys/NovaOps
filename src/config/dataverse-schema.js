@@ -1,15 +1,29 @@
 /**
  * Dataverse Schema Configuration
- * Based on DATAVERSE_SCHEMA_MAPPING.md - Single Source of Truth
+ * Based on DATAVERSE_SCHEMA_MAPPING.md and DataverseDetails.txt - Single Source of Truth
  * 
  * This file defines the complete Dataverse schema structure including:
- * - Table names
+ * - API base URL
+ * - Table names (EntitySet names from DataverseDetails.txt)
  * - Column mappings (friendly names → Dataverse logical names)
  * - Primary keys
  * - Lookup relationships
  * - Status codes/option sets
  * - Default select fields
+ * 
+ * Last Updated: Based on DataverseDetails.txt extraction
+ * All table names and field names verified against DataverseDetails.txt
  */
+
+/**
+ * Dataverse API Base URL
+ * Environment Variables:
+ * - Local Dev: VITE_DATAVERSE_URL (from .env file)
+ * - Production: VITE_DATAVERSE_URL (set during build in Azure)
+ */
+export const DATAVERSE_BASE_URL = import.meta.env.VITE_DATAVERSE_URL || 
+                                   import.meta.env.DATAVERSE_URL || 
+                                   'https://mostafashafie-uaesenvironment.crm4.dynamics.com/api/data/v9.2';
 
 export const DataverseSchema = {
   // ===========================================================================
@@ -545,11 +559,11 @@ export const DataverseSchema = {
   // RAW AGGREGATED (ACTUAL SALES)
   // ===========================================================================
   rawAggregated: {
-    tableName: 'new_rawaggregateds', // With 's' - verified from Dataverse API service document
+    tableName: 'new_rawaggregateds', // With 's' - verified from DataverseDetails.txt
     primaryKey: 'new_rawaggregatedid',
     columns: {
       id: 'new_rawaggregatedid',
-      name: 'new_name',
+      name: 'new_name', // NOTE: Quantity is stored in the 'name' field as a string (parsed as number in StockCalculationService._extractQuantity)
       date: 'new_date',
       channel: 'new_channel',
       docType: 'new_doctype',
@@ -669,6 +683,32 @@ export const DataverseSchema = {
   },
 
   // ===========================================================================
+  // DOC TYPES
+  // ===========================================================================
+  docTypes: {
+    tableName: 'new_doctypes', // Plural - verified from Dataverse API service document
+    primaryKey: 'new_doctypeid',
+    columns: {
+      id: 'new_doctypeid',
+      name: 'new_doctype',
+      invoiceType: 'new_invoicetype',
+      normalizedDocType: 'new_normalizeddoctype',
+      status: 'statecode',
+      statusReason: 'statuscode',
+      createdOn: 'createdon',
+      modifiedOn: 'modifiedon',
+    },
+    lookups: {
+      country: 'new_Country@odata.bind',
+    },
+    filterFields: {
+      country: '_new_country_value',
+    },
+    statusCodes: {},
+    defaultSelect: ['new_doctypeid', 'new_doctype', 'new_invoicetype', 'new_normalizeddoctype'],
+  },
+
+  // ===========================================================================
   // DOC TYPE CALCULATIONS
   // ===========================================================================
   docTypeCalculations: {
@@ -689,6 +729,77 @@ export const DataverseSchema = {
     filterFields: {},
     statusCodes: {},
     defaultSelect: ['new_doctypecalculationsid', 'new_name', 'new_doctype', 'new_doctypesign', 'new_doctypetext'],
+  },  // ===========================================================================
+  // CALCULATION MAPPINGS
+  // ===========================================================================
+  calculationMappings: {
+    tableName: 'new_calculationmappings', // Plural - following pattern of other tables
+    primaryKey: 'new_calculationmappingid',
+    columns: {
+      id: 'new_calculationmappingid',
+      name: 'new_name',
+      measureKey: 'new_measurekey',
+      measureName: 'new_measurename', // NEW: Measure display name
+      sourceTable: 'new_sourcetable',
+      fieldName: 'new_fieldname',
+      docTypePatterns: 'new_doctypepatterns',
+      channelPatterns: 'new_channelpatterns',
+      sign: 'new_sign',
+      quantityField: 'new_quantityfield',
+      mappingType: 'new_mappingtype',
+      configuration: 'new_configuration',
+      sortOrder: 'new_sortorder',
+      aggregationType: 'new_aggregationtype', // NEW: Aggregation function (SUM, COUNT, AVG, etc.)
+      filterLogic: 'new_filterlogic', // NEW: JSON for complex filter conditions
+      groupByColumns: 'new_groupbycolumns', // NEW: JSON array for grouping columns
+      calculationExpression: 'new_calculationexpression', // NEW: DAX-like expression
+      status: 'statecode',
+      statusReason: 'statuscode',
+      createdOn: 'createdon',
+      modifiedOn: 'modifiedon',
+    },
+    lookups: {},
+    filterFields: {},
+    statusCodes: {
+      sign: {
+        100000000: 'Positive', // Dataverse option set value
+        100000001: 'Negative', // Dataverse option set value
+        100000002: 'Both', // Dataverse option set value
+      },
+      mappingType: {
+        100000000: 'DocType',
+        100000001: 'Field',
+        100000002: 'Pattern',
+        100000003: 'Combined',
+      },
+      aggregationType: {
+        100000000: 'SUM',
+        100000001: 'COUNT',
+        100000002: 'COUNT DISTINCT',
+        100000003: 'AVERAGE',
+        100000004: 'MIN',
+        100000005: 'MAX',
+      },
+    },
+    defaultSelect: [
+      'new_calculationmappingid',
+      'new_name',
+      'new_measurename',
+      'new_measurekey',
+      'new_sourcetable',
+      'new_fieldname',
+      'new_doctypepatterns',
+      'new_channelpatterns',
+      'new_sign',
+      'new_quantityfield',
+      'new_mappingtype',
+      'new_configuration',
+      'new_sortorder',
+      'new_aggregationtype',
+      'new_filterlogic',
+      'new_groupbycolumns',
+      'new_calculationexpression',
+    ],
   },
 };
 

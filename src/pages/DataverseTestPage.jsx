@@ -173,7 +173,7 @@ export default function DataverseTestPage() {
       name: 'SKUs',
       method: 'getSkus',
       description: 'Master data for Stock Keeping Units (products)',
-      usedIn: ['StockManagementPage', 'StockCoverService', 'SKU selection']
+      usedIn: ['StockManagementPage', 'StockManagementService', 'SKU selection']
     },
     orders: {
       name: 'Orders (POs)',
@@ -191,13 +191,13 @@ export default function DataverseTestPage() {
       name: 'Forecasts',
       method: 'getForecasts',
       description: 'Forecast data for future demand planning',
-      usedIn: ['ForecastsPage', 'ForecastService', 'StockCoverService', 'AutoForecast Azure Function']
+      usedIn: ['ForecastsPage', 'ForecastService', 'StockManagementService', 'AutoForecast Azure Function']
     },
     budgets: {
       name: 'Budgets',
       method: 'getBudgets',
       description: 'Budget data used as fallback when forecasts unavailable',
-      usedIn: ['StockCoverService', 'AutoForecast Azure Function']
+      usedIn: ['StockManagementService', 'AutoForecast Azure Function']
     },
     shipments: {
       name: 'Shipments',
@@ -221,7 +221,7 @@ export default function DataverseTestPage() {
       name: 'Target Cover Stock',
       method: 'getTargetCoverStock',
       description: 'Configuration for target months of stock cover',
-      usedIn: ['StockCoverService', 'AutoForecast Azure Function']
+      usedIn: ['StockManagementService', 'AutoForecast Azure Function']
     },
     procurementSafeMargin: {
       name: 'Procurement Safe Margin',
@@ -251,7 +251,7 @@ export default function DataverseTestPage() {
       name: 'Future Inventory Forecasts',
       method: 'getFutureInventory',
       description: 'Calculated future inventory projections',
-      usedIn: ['StockCoverService', 'AutoForecast Azure Function']
+      usedIn: ['StockManagementService', 'AutoForecast Azure Function']
     },
     rawAggregated: {
       name: 'Raw Aggregated',
@@ -263,7 +263,7 @@ export default function DataverseTestPage() {
       name: 'Actual Inventory',
       method: 'getActualInventory',
       description: 'Actual opening and closing stock for real months - real inventory data',
-      usedIn: ['StockManagementPage', 'StockCoverService', 'Actual inventory tracking']
+      usedIn: ['StockManagementPage', 'StockManagementService', 'Actual inventory tracking']
     },
     optionSetVerification: {
       name: 'Option Set Verification',

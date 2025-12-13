@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useStockCover } from './index.js';
+import { Logger } from '@/utils/index.js';
+
+const logger = new Logger('useStockCoverPage');
 
 /**
  * Custom hook for StockCoverPage business logic
@@ -40,7 +43,7 @@ export const useStockCoverPage = (selectedCountry) => {
       await updatePlannedQty(selectedCountry, editingCell.skuId, editingCell.monthKey, newValue);
       setEditingCell(null);
     } catch (err) {
-      console.error('Error updating planned quantity:', err);
+      logger.error('Error updating planned quantity', { error: err.message });
       throw err;
     }
   };

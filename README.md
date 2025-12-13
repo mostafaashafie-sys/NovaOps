@@ -203,13 +203,14 @@ All components are built with Tailwind CSS and follow a consistent design system
 
 ## 📚 Documentation
 
-For detailed information, see:
+All documentation is organized in the [`docs/`](./docs/) directory:
 
-- **ARCHITECTURE.md** - Complete architecture documentation, folder structure, layer responsibilities, and data model relationships
-- **BUSINESS_LOGIC.md** - Business logic workflow, data models, and user roles
-- **Order_Lifecycle_Documentation_v2.md** - Complete order and PO lifecycle documentation with status flows
-- **COMPONENT_ORGANIZATION.md** - Component organization guide, import patterns, and feature location guide
-- **REUSABLE_COMPONENTS_GUIDE.md** - Guide to reusable UI components and their usage
+- **[Architecture](./docs/architecture/)** - System architecture, layer responsibilities, and design patterns
+- **[Implementation](./docs/implementation/)** - Implementation status, measures, and time intelligence
+- **[Dataverse](./docs/dataverse/)** - Schema mapping, table documentation, and Dataverse integration
+- **[Business](./docs/business/)** - Business logic, workflows, and order lifecycle
+
+See [`docs/README.md`](./docs/README.md) for the complete documentation index.
 
 ## 📄 License
 
